@@ -85,7 +85,7 @@ void customLineProjections() {
 }
 
 std::string getPath(std::string type, std::string file_type, bool out = false,  std::string model = "", std::string algo = "", std::string geometry = "") {
-    std::string out_string = "E:/test_proj/tomo_cmake/projector_test/";
+    std::string out_string = "D:/Projects/tomo_cmake/tomo_cmake/projector_test/";
     if (out) {
         out_string += "out_images/";
         out_string += type + "." + file_type;
@@ -101,12 +101,12 @@ int main()
 {   
     //customLineProjections();
     //std::cout << std::numeric_limits<double>::is_iec559 << " " << std::numeric_limits<double>::digits <<  std::endl;
-    double delta_limit = 10000.0;
-    double delta_limit_2 = 20000000;
+    double delta_limit = 2000000;
+    double delta_limit_2 = 0.2;
     double distance_obj = 500.0, distance_source = 7000.0;
 
-    std::string model           = "phantom"; // "phantom", "model";
-    std::string algo_string     = "line";    // "area", "line";
+    std::string model           = "model"; // "phantom", "model";
+    std::string algo_string     = "area";    // "area", "line";
     std::string geometry_string = "fan";     // "fan", "par";
     bool exact = true;
     
@@ -237,7 +237,7 @@ int main()
     float total_delta = 0.0f;
     float out_delta = 1.0f, max_delta = 0.0f;
     int pos_delta = 0, neg_delta = 0;
-    float percentage_delta, max_percentage_delta = 0.0f;
+    float percentage_delta = 0.0f, max_percentage_delta = 0.0f;
     std::ofstream output_f(out_delta_txt_path);
     output_f << "delta " << "target " << "res" << std::endl;
     for (int i = 0; i < angle_count; ++i) {
@@ -262,6 +262,11 @@ int main()
                 pos_delta += 1;
             else
                 neg_delta += 1;
+            if (std::abs(delta) > delta_limit_2 && i < angle_count/2) {
+                float delta1 = target_f[i * detector_size + j] - target_f[(180 + i) * detector_size + j];
+                float delta2 = myProj.fullProjection[i * detector_size + j] - myProj.fullProjection[(180 + i) * detector_size + j];
+                std::cout << "delta: " << delta << " target: " << delta1 << " res: " << delta2 << std::endl;
+            }
             if (std::abs(delta) > 0) {
                 Line line = myProj.geometry->v_GetNextLineCenter(myProj.geometry->angles[i], j);
 

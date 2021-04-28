@@ -18,7 +18,7 @@ public:
 
 	const int imgSize_x, imgSize_y;
 	std::shared_ptr<Geometry> geometry;
-	std::unique_ptr<float[]> fullProjection;
+	std::unique_ptr<float[]> fullProjection = nullptr;
 
 	// debug vars
 	bool testFlag = false;
@@ -31,6 +31,7 @@ public:
 
 	std::unique_ptr<float[]> getSingleProjection(int angle_i) const;
 	void buildFullProjection();
+	std::unique_ptr<float[]> getFullProjection();
 	std::unique_ptr<unsigned char[]> getFullProjectionImage();
 
 	// common methods

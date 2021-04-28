@@ -781,6 +781,7 @@ std::unique_ptr<float[]> Projector::getSingleProjection(int i_angle) const {
 			line1 = constructLine(line_pair.first);
 			line2 = constructLine(line_pair.second, line1.transpose, line1.reverse_x);
 			out = sumArea(line1, line2);
+			//out = out * (1 - geometry->part * 2.0);
 			break;
 		case SumAlgo::AREA_EXACT:
 			if (i_angle == 86 && i == 218)
@@ -842,6 +843,12 @@ std::unique_ptr<unsigned char[]> Projector::getFullProjectionImage() {
 	return outCharImg;
 };
 
+std::unique_ptr<float[]> Projector::getFullProjection() {
+	if (!fullProjection) {
+		buildFullProjection();
+	}
+	return std::move(fullProjection);
+}
 
 // debug methods
 
@@ -893,81 +900,4 @@ float Projector::getLineProjectionTest(const int& i_angle, const int& detector) 
 	//out = sumLineLinear(geometry->v_GetNextLine(angle, detector));
 
 	return out;
-}
-
-float Projector::sumLineTest(const Line& line) {
-
-	testFlag = false;
-
-	if (line.hor)
-		return 0.0f; //sumNeibs(-1, imgSize_x, line.b, 0);
-	else if (line.vert)
-		return 0.0f; //sumNeibs(-1, imgSize_y, line.b, 1);
-
-	std::pair<Point, Point> intersect = getIntersectionPoints(line);
-
-	if (intersect.first.x == -999)
-		return 0.0f;
-
-	float sum = 0.0f;
-	// choose axis to sum along based on line parameters
-	// axis = 1; dy = 0, dx = 1 || axis = 0; dy = 1, dx = 0
-	int axis = (std::abs(line.k) >= 1.0);
-	int sign = (line.k > 0) - (line.k < 0);
-	int i, j, i_max, j_max;
-	i = intersect.first.x;
-	j = intersect.first.y;
-	i_max = intersect.second.x;
-	j_max = intersect.second.y;
-
-	// main summation cycle
-	// summation is performed by sequencually finding next intersections of line and 
-	// vertical (axis = 0) or horizontal (axis = 1) pixel border, 
-	// summing up to this point and adding proportional values for the intersection area
-	float new_x, new_y, frac;
-	int new_i, new_j;
-
-	while (true) {
-		if (axis == 1) { // dy == 0
-			new_i = i + sign;
-			if (sign > 0)
-				new_y = line.value(new_i);
-			else
-				new_y = line.value(i);
-			new_j = std::floor(new_y);
-			// todo
-			sum += 0.0f; //sumNeibs(j, new_j, i, axis);
-			frac = std::abs(new_y - new_j);
-			float b = inputImg.get(i, new_j) * frac + inputImg.get(new_i, new_j) * (1 - frac);
-			sum += b;
-			if (b > 0)
-				testFlag = true;
-			i = new_i;
-			j = new_j + 1;
-			assert(sum >= 0);
-			if (j > j_max)
-				return sum / std::abs(std::sin(line.angle));
-		}
-		else if (axis == 0) { // dx == 0
-			new_j = j + sign;
-			if (sign > 0)
-				new_x = line.coor(new_j);
-			else
-				new_x = line.coor(j);
-			new_i = std::floor(new_x);
-			// todo
-			float a = 0.0f; //sumNeibs(i, new_i, j, axis);
-			sum += a;
-			frac = std::abs(new_x - new_i);
-			float b = inputImg.get(new_i, j) * frac + inputImg.get(new_i, new_j) * (1 - frac);
-			if (b > 0)
-				testFlag = true;
-			sum += b;
-			j = new_j;
-			i = new_i + 1;
-			assert(sum >= 0);
-			if (i > i_max)
-				return sum / std::abs(std::cos(line.angle));
-		}
-	}
 }

@@ -6,11 +6,16 @@
 
 class GeometryFanBeam : public Geometry {
 public:
+
 	GeometryFanBeam(const std::vector<double>& i_angles, int i_detectorCount, double i_detectorSize, double i_dSourceToObj, double i_dObjToDetector, double imgCenterX, double imgCenterY) :
 		Geometry(i_angles, i_detectorCount, i_detectorSize, i_dSourceToObj, i_dObjToDetector, imgCenterX, imgCenterY)
 	{
 		// precalculating distances and angles for pixels of detector matrix
 		// in experiment pixels are rotating around origin with new distance and initial angle
+		double delta_angle = std::atan2(0.5 - 0.0, i_dSourceToObj + i_dObjToDetector);
+		double d1 = (i_dSourceToObj - imgCenterX);
+		double d2 = (i_dSourceToObj + imgCenterX);
+		part = (1 - (d2 * d2 - d1 * d1) * std::sin(delta_angle) / (imgCenterX * 2)) / 2;
 
 		double center = (detectorCount) * 0.5 * detectorSize;
 		for (int i = 0; i < detectorCount; ++i) {
@@ -29,20 +34,17 @@ public:
 		}
 
 		for (int i = 0; i < detectorCount; ++i) {
-			double delta_angle = std::atan2(0.5 - 0.0, i_dSourceToObj + i_dObjToDetector);
-			//double part = imgCenterX*2.0 * std::sin(delta_angle)*2;
-			double d1 = (i_dSourceToObj - imgCenterX);
-			double d2 = (i_dSourceToObj + imgCenterX);
-			double part = (1 - (d2 * d2 - d1 * d1) * std::sin(delta_angle) / (imgCenterX * 2)) / 2;
-
+			
 			double det_y = center - detectorSize * (i + part);
+			//double det_y = center - detectorSize * (i);
 			double dist = std::pow(dObjToDetector * dObjToDetector + det_y * det_y, 0.5);
-			double angle = std::atan2(-det_y, dObjToDetector);
+			double angle = std::atan2(det_y, dObjToDetector);
 			distanceToDetectorPixelLeft.push_back(dist);
 			angleToDetectorPixelLeft.push_back(angle);
 			det_y = center - detectorSize * (i + 1 - part);
+			//det_y = center - detectorSize * (i + 1);
 			dist = std::pow(dObjToDetector * dObjToDetector + det_y * det_y, 0.5);
-			angle = std::atan2(-det_y, dObjToDetector);
+			angle = std::atan2(det_y, dObjToDetector);
 			distanceToDetectorPixelRight.push_back(dist);
 			angleToDetectorPixelRight.push_back(angle);
 		}
@@ -50,11 +52,11 @@ public:
 	}
 
 	virtual Line v_GetNextLineCenter(int i_angle, int detector_i) {
-		double angle = angles[i_angle];
-		double x_source = -dSourceToObj * std::sin(angle) + imgCenterX;
-		double y_source = -dSourceToObj * std::cos(angle) + imgCenterY;
-		double x_det = distanceToDetectorPixelCenter[detector_i] * std::sin(angle - angleToDetectorPixelCenter[detector_i]) + imgCenterX;
-		double y_det = distanceToDetectorPixelCenter[detector_i] * std::cos(angle - angleToDetectorPixelCenter[detector_i]) + imgCenterY;
+		double angle = M_PI - angles[i_angle];
+		double x_source = - dSourceToObj * std::sin(angle) + imgCenterX;
+		double y_source = dSourceToObj * std::cos(angle) + imgCenterY;
+		double x_det = - distanceToDetectorPixelCenter[detector_i] * std::sin(M_PI + angle + angleToDetectorPixelCenter[detector_i]) + imgCenterX;
+		double y_det = distanceToDetectorPixelCenter[detector_i] * std::cos(M_PI + angle + angleToDetectorPixelCenter[detector_i]) + imgCenterY;
 		return Line(x_source, y_source, x_det, y_det);
 	};
 

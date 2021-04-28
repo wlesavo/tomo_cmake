@@ -7,6 +7,7 @@ public:
 	const double dSourceToObj, dObjToDetector, detectorSize, imgCenterX, imgCenterY;
 	const int detectorCount;
 	const std::vector<double> angles;
+	double part;
 	std::vector<double> distanceToDetectorPixelCenter, angleToDetectorPixelCenter;
 	std::vector<double> distanceToDetectorPixelLeft, angleToDetectorPixelLeft;
 	std::vector<double> distanceToDetectorPixelRight, angleToDetectorPixelRight;
