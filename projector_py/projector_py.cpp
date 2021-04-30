@@ -33,7 +33,7 @@ PROJECTOR_API struct Projector* projector_create(float* inputImg, int imgSize_x,
 	size_t size = static_cast<size_t>(imgSize_x) * imgSize_y;
 	std::unique_ptr<float[]> img(new float[size]);
 	std::copy(inputImg, inputImg + size, img.get());
-	return new Projector(std::move(img), imgSize_x, imgSize_y, *reinterpret_cast<std::shared_ptr<Geometry>*>(geometry), reinterpret_cast<SumAlgo&>(sumAlgorithm));
+	return new Projector(std::move(img), *reinterpret_cast<std::shared_ptr<Geometry>*>(geometry), reinterpret_cast<SumAlgo&>(sumAlgorithm), imgSize_x, imgSize_y);
 }
 
 PROJECTOR_API void projector_free(struct Projector* projector) {

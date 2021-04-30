@@ -4,6 +4,7 @@ enum class SumAlgo {
 	LINE,
 	AREA,
 	AREA_EXACT,
+	LINE3D,
 	LINEAR,
 	BINARY,
 };
