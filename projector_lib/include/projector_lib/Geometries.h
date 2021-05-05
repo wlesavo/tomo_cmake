@@ -158,5 +158,32 @@ public:
 	};
 };
 
+class GeometryParallel3D : public Geometry {
+public:
+
+	GeometryParallel3D(const std::vector<double>& i_angles, int i_detectorCount_x, int i_detectorCount_y, double i_detectorSize, double imgCenterX, double imgCenterY, double imgCenterZ) :
+		Geometry(i_angles, i_detectorCount_x, i_detectorCount_y, i_detectorSize, 0.0, 0.0, imgCenterX, imgCenterY, imgCenterZ)
+	{
+		// precalculating distances and angles for pixels of detector matrix
+		// in experiment pixels are rotating around origin with new distance and initial angle
+		double center = (detectorCount_x) * 0.5 * detectorSize;
+		for (int i = 0; i < detectorCount_x; ++i) {
+			double det_y = detectorSize * ((i + 0.5)-center);
+			distanceToDetectorPixelCenter.push_back(det_y);
+		}
+	}
+
+	virtual Line v_GetNextLineCenter(int i_angle, int detector) {
+		double angle = -angles[i_angle];
+		double x_det = distanceToDetectorPixelCenter[detector] * std::cos(-angle) + imgCenterX;
+		double y_det = distanceToDetectorPixelCenter[detector] * std::sin(-angle) + imgCenterY;
+		return Line(x_det, y_det, M_PI_2 - angle);
+	};
+
+	virtual std::pair<Line, Line> v_GetNextLinePair(int i_angle, int detector_i, bool parallel = true) {
+		return std::pair<Line, Line>(Line(), Line());
+	};
+
+};
 
 #endif

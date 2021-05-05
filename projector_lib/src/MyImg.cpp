@@ -6,14 +6,14 @@ MyImg::MyImg(std::unique_ptr<float[]> i_inputImg, int i_size_x, int i_size_y, in
 	, center_x(i_size_x * 0.5), center_y(i_size_y * 0.5), center_z(i_size_z * 0.5)
 {};
 
-float MyImg::get(int i, int j, bool transpose, bool reverse_x, bool reverse_y) const{
+float MyImg::get(int i, int j, bool transpose, bool reverse_x, bool reverse_y, int slice) const{
 
 	if (transpose) {
 		int a = j;
 		j = i;
 		i = a;
 	}
-	if (i < 0 || i >= size_x || j < 0 || j >= size_y) {
+	if (i < 0 || i >= size_x || j < 0 || j >= size_y || slice < 0 || slice >= size_z) {
 		return 0;
 	}
 	if (reverse_x)
@@ -23,7 +23,7 @@ float MyImg::get(int i, int j, bool transpose, bool reverse_x, bool reverse_y) c
 
 	int coor;
 
-	coor = i + j * size_x;
+	coor = i + j * size_x + slice * size_x * size_y;
 	if (coor > size_x * size_y) {
 		return 0;
 	}

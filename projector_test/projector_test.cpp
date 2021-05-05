@@ -116,8 +116,14 @@ std::unique_ptr<Projector> getProjector(std::string dim, int angle_count = 180, 
             }
             input_phantom.close();
         }
-        input_geometry = std::move(std::make_shared<GeometryFanBeam3D>(GeometryFanBeam3D(angles, detector_count_x, detector_count_y, 1.0, distance_source, distance_obj, size_x * 0.5, size_y * 0.5, size_z * 0.5)));
-        sum_algo = SumAlgo::LINE3D;
+        if (geometry_string == "fan") {
+            input_geometry = std::move(std::make_shared<GeometryFanBeam3D>(GeometryFanBeam3D(angles, detector_count_x, detector_count_y, 1.0, distance_source, distance_obj, size_x * 0.5, size_y * 0.5, size_z * 0.5)));
+            sum_algo = SumAlgo::LINE3DFAN;
+        }
+        if (geometry_string == "par") {
+            input_geometry = std::move(std::make_shared<GeometryParallel3D>(GeometryParallel3D(angles, detector_count_x, detector_count_y, 1.0, size_x * 0.5, size_y * 0.5, size_z * 0.5)));
+            sum_algo = SumAlgo::LINE3DPARALLEL;
+        }
     }
 
     return std::unique_ptr<Projector>(new Projector(std::move(img), std::move(input_geometry), sum_algo, size_x, size_y, size_z));
@@ -238,7 +244,7 @@ void test3D(std::string model) {
     std::vector<double> angles = getAngles(0.0, M_PI, angle_count);
     std::shared_ptr<Geometry> input_geometry = nullptr;
     input_geometry = std::move(std::make_shared<GeometryFanBeam3D>(GeometryFanBeam3D(angles, detector_size_x, detector_size_y, 1.0, distance_source, distance_obj, size_x * 0.5, size_y * 0.5, size_z * 0.5)));
-    Projector proj(std::move(img), input_geometry, SumAlgo::LINE3D, size_x, size_y, size_z);
+    Projector proj(std::move(img), input_geometry, SumAlgo::LINE3DFAN, size_x, size_y, size_z);
     proj.buildFullProjection();
 
     // count sigma and max delta
@@ -310,8 +316,8 @@ void fullTest2D() {
     double distance_obj = 500.0, distance_source = 7000.0;
 
     std::string model = "model"; // "phantom", "model";
-    std::string algo_string = "line";    // "area", "line";
-    std::string geometry_string = "par";     // "fan", "par";
+    std::string algo_string = "area";    // "area", "line";
+    std::string geometry_string = "fan";     // "fan", "par";
     int size_z = 1;
     int detector_size_y = 100;
     bool exact = true;
@@ -565,9 +571,9 @@ void test3D_self_projection(){
     int angle_count = 90;
     double distance_source  = 7000.0;
     double distance_obj     = 500.0;
-    std::string model           = "phantom";
+    std::string model           = "model";
     std::string algo_string     = "line";
-    std::string geometry_string = "fan";
+    std::string geometry_string = "par";
     
     std::string p = getPath("phantom", "2D", "txt", false, model);
     std::ifstream input_phantom(p);
@@ -598,7 +604,7 @@ void test3D_self_projection(){
     }
 
     auto proj2D = getProjector("2D", angle_count, detector_count_x, 1,                model, algo_string, geometry_string, distance_source, distance_obj, std::move(phantom2D), size_x, size_y, 1);
-    auto proj3D = getProjector("3D", angle_count, detector_count_x, detector_count_y, "", "", "", distance_source, distance_obj, std::move(phantom3D), size_x, size_y, size_z);
+    auto proj3D = getProjector("3D", angle_count, detector_count_x, detector_count_y, "", "", geometry_string, distance_source, distance_obj, std::move(phantom3D), size_x, size_y, size_z);
 
     std::string out_diff_float = getPath("out_residual_float", "", "bmp", true);
     const char* const out_diff_float_path = out_diff_float.c_str();
@@ -613,9 +619,12 @@ void test3D_self_projection(){
 
     float max_val = 0.0f;
     float total_max_delta = 0.0f;
+    double koeff = 1.0;
     for (int k = 0; k < detector_count_y; ++k) {
-        double angle = std::atan((detector_count_y*0.5 - k - 0.5)/(distance_source + distance_obj));
-        double koeff = std::abs(std::cos(angle));
+        if (geometry_string == "fan") {
+            double angle = std::atan((detector_count_y * 0.5 - k - 0.5) / (distance_source + distance_obj));
+            koeff = std::abs(std::cos(angle));
+        }
         float delta = 0.0f;
         float total_delta = 0.0f;
         float out_delta = 1.0f, max_delta = 0.0f;
@@ -656,8 +665,10 @@ void test3D_self_projection(){
     cimg_library::CImg<unsigned char> sino(detector_count_y * angle_count, detector_count_x, 1, 1, 0);
     cimg_library::CImg<unsigned char> sino_2D(detector_count_y * angle_count, detector_count_x, 1, 1, 0);
     for (int k = 0; k < detector_count_y; ++k) {
-        double angle = std::atan((detector_count_y * 0.5 - (k + 0.5)) / (distance_source + distance_obj));
-        double koeff = std::abs(std::cos(angle));
+        if (geometry_string == "fan") {
+            double angle = std::atan((detector_count_y * 0.5 - k - 0.5) / (distance_source + distance_obj));
+            koeff = std::abs(std::cos(angle));
+        }
         for (int i = 0; i < angle_count; ++i) {
             for (int j = 0; j < detector_count_x; ++j) {
                 float target = proj2D->fullProjection[j + i * detector_count_x];
@@ -686,8 +697,7 @@ void test3D_self_projection(){
 
 int main()
 {   
-    //fullTest2D();
+    fullTest2D();
     //test3D("model");
-    test3D_self_projection();
-
+    //test3D_self_projection();
 }

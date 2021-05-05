@@ -37,14 +37,14 @@ public:
 	std::pair<Point, Point> getIntersectionPoints(const Line& line, int pixel_i = -999, int pixel_j = -999) const;
 	std::pair<Line, Line> sortLines(const Line& line1, const Line& line2) const;
 	float manyPixelArea(int i_min, int i_max, int j, bool upper, const Line& line) const;
-	float sumNeibs(double i_min, double i_max, double j, bool transpose, bool reverse_x) const;
+	float sumNeibs(double i_min, double i_max, double j, bool transpose, bool reverse_x, int slice = 0) const;
 	double singlePixelArea(int i, int j, const Line& line) const;
 	Line constructLine3D(const Line& line) const;
 	Line constructLine(const Line& line) const;
 	Line constructLine(const Line& line, bool transpose, bool reverse_x) const;
 
 	// sum algorithms
-	float sumLine(const Line& line) const;
+	float sumLine(const Line& line, int slice = 0) const;
 	float sumLine3D(const Line& line) const;
 	float sumLinear(const Line& line) const;
 	float sumArea(const Line& line1, const Line& line2) const;
