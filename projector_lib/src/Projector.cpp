@@ -21,8 +21,14 @@ std::pair<Point, Point> Projector::getIntersectionPoints(const Line& line, int p
 	if (pixel_i == -999) {
 		min_x = 0;
 		min_y = 0;
-		max_x = imgSize_x;
-		max_y = imgSize_y;
+		if (line.transpose) {
+			max_x = imgSize_y;
+			max_y = imgSize_x;
+		}
+		else {
+			max_x = imgSize_x;
+			max_y = imgSize_y;
+		}
 	}
 	else {
 		min_x = pixel_i;
@@ -269,19 +275,24 @@ Line Projector::constructLine(const Line& line) const {
 	if (line.vert) { return out_line; }
 
 	out_line.b = line.b + inputImg.center_x * line.k - inputImg.center_y;
+	
+	if (line.k < 0) {
+		out_line.reverse_x = true;
+		out_line.k = -out_line.k;
+		out_line.angle = M_PI - out_line.angle;
+	}
 	if (std::abs(line.k) < 1) {
 		out_line.transpose = true;
 		out_line.b = out_line.coor(0.0);
 		out_line.k = 1 / out_line.k;
 		out_line.angle = M_PI_2 - out_line.angle;
 	}
-	if (line.k < 0) {
-		out_line.reverse_x = true;
-		out_line.k = - out_line.k;
-		out_line.angle = M_PI - out_line.angle;
+	if (!out_line.transpose) {
+		out_line.b = out_line.b - inputImg.center_x * out_line.k + inputImg.center_y;
 	}
-	out_line.b = out_line.b - inputImg.center_x * out_line.k + inputImg.center_y;
-
+	else {
+		out_line.b = out_line.b - inputImg.center_y * out_line.k + inputImg.center_x;
+	}
 	out_line.reverse_k = 1.0 / out_line.k;
 	out_line.reverse_ab = 1.0 / std::pow(1.0 + out_line.k * out_line.k, 0.5);
 	return out_line;
@@ -365,8 +376,10 @@ float Projector::sumLine(const Line& line) const {
 	// travels inside the pixel
 
 
-	if (line.vert)
-		return sumNeibs(-1, imgSize_y, line.b, line.transpose, line.reverse_x);
+	if (line.vert) {
+		int s = line.transpose ? imgSize_x : imgSize_y;
+		return sumNeibs(-1, s, line.b, line.transpose, line.reverse_x);
+	}
 
 	std::pair<Point, Point> intersect = getIntersectionPoints(line);
 
@@ -524,8 +537,6 @@ float Projector::sumArea(const Line& line_1, const Line& line_2) const {
 		if (j > j_max)
 			return sum;
 	}
-
-
 }
 
 float Projector::sumAreaExact(const Line& line_1, const Line& line_2) const {

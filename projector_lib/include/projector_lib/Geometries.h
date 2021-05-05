@@ -34,7 +34,6 @@ public:
 		}
 
 		for (int i = 0; i < detectorCount; ++i) {
-			
 			double det_y = center - detectorSize * (i + part);
 			//double det_y = center - detectorSize * (i);
 			double dist = std::pow(dObjToDetector * dObjToDetector + det_y * det_y, 0.5);
@@ -157,7 +156,6 @@ public:
 	virtual std::pair<Line, Line> v_GetNextLinePair(int i_angle, int detector_i, bool parallel = true) {
 		return std::pair<Line, Line>(Line(), Line());		
 	};
-
 };
 
 

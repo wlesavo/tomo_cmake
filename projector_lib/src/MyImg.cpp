@@ -1,4 +1,5 @@
 #include <projector_lib/MyImg.h>
+#include <iostream>
 
 MyImg::MyImg(std::unique_ptr<float[]> i_inputImg, int i_size_x, int i_size_y, int i_size_z)
 	: size_x(i_size_x), size_y(i_size_y), size_z(i_size_z), inputImg(std::move(i_inputImg))
@@ -6,18 +7,26 @@ MyImg::MyImg(std::unique_ptr<float[]> i_inputImg, int i_size_x, int i_size_y, in
 {};
 
 float MyImg::get(int i, int j, bool transpose, bool reverse_x, bool reverse_y) const{
+
+	if (transpose) {
+		int a = j;
+		j = i;
+		i = a;
+	}
 	if (i < 0 || i >= size_x || j < 0 || j >= size_y) {
 		return 0;
 	}
-	int coor;
 	if (reverse_x)
 		i = size_x - 1 - i;
 	if (reverse_y)
 		j = size_y - 1 - j;
-	if (transpose)
-		coor = j + i * size_y;
-	else
-		coor = i + j * size_x;
+
+	int coor;
+
+	coor = i + j * size_x;
+	if (coor > size_x * size_y) {
+		return 0;
+	}
 	return inputImg[coor];
 };
 
