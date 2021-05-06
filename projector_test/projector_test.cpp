@@ -7,14 +7,128 @@
 
 std::vector<double> getAngles(double start, double end, int count) {
     std::vector<double> angles;
-    double current = start;
     double delta = (end - start) / count;
-    while (current < end) {
-        angles.push_back(current);
-        current += delta;
+    for (int i = 0; i < count; ++i){
+        angles.push_back(start + delta*i);
     }
     return angles;
 }
+
+std::string getPath(std::string type, std::string dim, std::string file_type, bool out = false, std::string model = "", std::string algo = "", std::string geometry = "") {
+    std::string out_string = "E:/test_proj/tomo_cmake/projector_test/";
+    if (out) {
+        out_string += "out_images/";
+        if (type.size() > 0)
+            out_string += type;
+        if (dim.size() > 0)
+            out_string += "_" + dim;
+        out_string += "." + file_type;
+    }
+    else {
+        out_string += "assets/";
+        if (type == "sinogram") {
+            out_string += "target_sinograms/";
+        }
+        if (type == "phantom") {
+            out_string += "phantoms/"+model;
+        }
+        else if (type.size() > 0)
+            out_string += type;
+        if (dim.size() > 0)
+            out_string += "_" + dim;
+        if (type != "phantom") {
+            if (model.size() > 0)
+                out_string += "_" + model;
+        }        
+        if (geometry.size() > 0)
+            out_string += "_" + geometry;
+        if (algo.size() > 0)
+            out_string += "_" + algo;
+        out_string += "." + file_type;
+    }
+    return out_string;
+}
+
+std::unique_ptr<Projector> getProjector(std::string dim, int angle_count = 180, int detector_count_x = 256, int detector_count_y = 1
+    , std::string model = "", std::string algo_string = "", std::string geometry_string = "", double distance_source = 7000.0, double distance_obj = 500.0, std::unique_ptr<float[]> input_img = nullptr
+    , int size_x = 1, int size_y =1, int size_z = 1) {
+    bool exact = true;
+    std::string type = "bmp";
+    if (dim == "3D") {
+        type = "txt";
+    }
+    bool custom_phantom = false;
+    std::string p = getPath("phantom", dim, type, false, model);
+    std::vector<double> angles = getAngles(0, M_PI, angle_count);
+    std::shared_ptr<Geometry> input_geometry = nullptr;
+    auto sum_algo = SumAlgo::LINE;
+    std::unique_ptr<float[]> img;
+    if (input_img) {
+        img = std::move(input_img);
+        custom_phantom = true;
+    }
+    if (dim == "2D"){
+        if (!custom_phantom) {
+            const char* const phantom_path = p.c_str();
+            cimg_library::CImg<unsigned char> phantom(phantom_path);
+            size_x = phantom.width();
+            size_y = phantom.height();
+            img = std::unique_ptr<float[]>(new float[size_x * size_y]{});
+            for (int i = 0; i < size_x; ++i) {
+                for (int j = 0; j < size_y; ++j) {
+                    img[i + j * size_x] = (float)phantom(i, j, 0, 0);
+                }
+            }
+
+        }
+        if (algo_string == "area") {
+            if (exact)
+                sum_algo = SumAlgo::AREA_EXACT;
+            else
+                sum_algo = SumAlgo::AREA;
+        }
+        else if (algo_string == "line") {
+            sum_algo = SumAlgo::LINE;
+        }
+        if (geometry_string == "fan") {
+            input_geometry = std::move(std::make_shared<GeometryFanBeam>(GeometryFanBeam(angles, detector_count_x, 1.0, distance_source, distance_obj, size_x * 0.5, size_y * 0.5)));
+        }
+        else {
+            input_geometry = std::move(std::make_shared<GeometryParallel>(GeometryParallel(angles, detector_count_x, 1.0, size_x * 0.5, size_y * 0.5)));
+        }
+
+    }
+
+    if (dim == "3D") {
+        if (!custom_phantom) {
+            std::ifstream input_phantom(p);
+            // read phantom
+            input_phantom >> size_x >> size_y >> size_z;
+            img = std::unique_ptr<float[]>(new float[size_x * size_y * size_z]{});
+            for (int k = 0; k < size_z; ++k) {
+                for (int j = 0; j < size_y; ++j) {
+                    for (int i = 0; i < size_x; ++i) {
+                        float a;
+                        input_phantom >> a;
+                        img[i + size_x * j + size_x * size_y * k] = a;
+                    }
+                }
+            }
+            input_phantom.close();
+        }
+        if (geometry_string == "fan") {
+            input_geometry = std::move(std::make_shared<GeometryFanBeam3D>(GeometryFanBeam3D(angles, detector_count_x, detector_count_y, 1.0, distance_source, distance_obj, size_x * 0.5, size_y * 0.5, size_z * 0.5)));
+            sum_algo = SumAlgo::LINE3DFAN;
+        }
+        if (geometry_string == "par") {
+            input_geometry = std::move(std::make_shared<GeometryParallel3D>(GeometryParallel3D(angles, detector_count_x, detector_count_y, 1.0, size_x * 0.5, size_y * 0.5, size_z * 0.5)));
+            sum_algo = SumAlgo::LINE3DPARALLEL;
+        }
+    }
+
+    return std::unique_ptr<Projector>(new Projector(std::move(img), std::move(input_geometry), sum_algo, size_x, size_y, size_z));
+}
+
 
 void customLineProjections() {
     std::vector<double> angles = getAngles(0.0, 180.0, 5.0);
@@ -85,39 +199,18 @@ void customLineProjections() {
     return;
 }
 
-std::string getPath(std::string type, std::string file_type, bool out = false,  std::string model = "", std::string algo = "", std::string geometry = "") {
-    std::string out_string = "D:/Projects/tomo_cmake/tomo_cmake/projector_test/";
-    if (out) {
-        out_string += "out_images/";
-        out_string += type + "." + file_type;
-    }
-    else {
-        out_string += "assets/";
-        if (type.size() > 0)
-            out_string += type;
-        if (model.size() > 0)
-            out_string += "_" + model;
-        if (geometry.size() > 0)
-            out_string += "_" + geometry;
-        if (algo.size() > 0)
-            out_string += "_" + algo;
-        out_string += "." + file_type;
-    }
-    return out_string;
-}
-
-void test3D() {
-    double distance_obj = 200.0, distance_source = 200.0;
+void test3D(std::string model) {
+    double distance_obj = 500.0, distance_source = 7000.0;
     float delta_limit = 2000000.0;
 
     int size_x, size_y, size_z;
     int detector_size_x, detector_size_y, angle_count;
-    std::string p = getPath("phantom_3D", "txt");
-    std::string s = getPath("sinogram_3D", "txt");
+    std::string p = getPath("phantom", "3D", "txt", false, model);
+    std::string s = getPath("sinogram", "3D", "txt", false, model);
     std::ifstream input_phantom(p);
     std::ifstream input_sinogram(s);
-    std::string out_sino = getPath("out_sinogram_3D", "bmp", true);
-    std::string out_diff = getPath("out_residual_float_3D", "bmp", true);
+    std::string out_sino = getPath("out_sinogram", "", "bmp", true);
+    std::string out_diff = getPath("out_residual_float", "", "bmp", true);
     const char* const out_sino_path = out_sino.c_str();
     const char* const out_diff_path = out_diff.c_str();
     
@@ -149,7 +242,7 @@ void test3D() {
     std::vector<double> angles = getAngles(0.0, M_PI, angle_count);
     std::shared_ptr<Geometry> input_geometry = nullptr;
     input_geometry = std::move(std::make_shared<GeometryFanBeam3D>(GeometryFanBeam3D(angles, detector_size_x, detector_size_y, 1.0, distance_source, distance_obj, size_x * 0.5, size_y * 0.5, size_z * 0.5)));
-    Projector proj(std::move(img), input_geometry, SumAlgo::LINE3D, size_x, size_y, size_z);
+    Projector proj(std::move(img), input_geometry, SumAlgo::LINE3DFAN, size_x, size_y, size_z);
     proj.buildFullProjection();
 
     // count sigma and max delta
@@ -215,33 +308,28 @@ void test3D() {
 }
 
 void fullTest2D() {
-    //customLineProjections();
-    //std::cout << std::numeric_limits<double>::is_iec559 << " " << std::numeric_limits<double>::digits <<  std::endl;
-    double a = 0.0;
-    std::vector<double> c = { 2, 4, 3, 4 };
-    //std::cout << (1.0 / a == INFINITY) << std::endl;
 
     double delta_limit = 2000000;
-    double delta_limit_2 = 2000;
+    double delta_limit_2 = 2000000;
     double distance_obj = 500.0, distance_source = 7000.0;
 
-    std::string model = "phantom"; // "phantom", "model";
-    std::string algo_string = "line";    // "area", "line";
-    std::string geometry_string = "par";     // "fan", "par";
-    int size_z = 100;
+    std::string model = "model"; // "phantom", "model";
+    std::string algo_string = "area";    // "area", "line";
+    std::string geometry_string = "fan";     // "fan", "par";
+    int size_z = 1;
     int detector_size_y = 100;
     bool exact = true;
 
     //std::string p = "..\\..\\..\\phantom" + model + geometry_string + algo_string + ".bmp";// ??
-    std::string p = getPath("phantom", "bmp", false, model, algo_string, geometry_string);
-    std::string t = getPath("sinogram", "bmp", false, model, algo_string, geometry_string);
-    std::string target_txt_path = getPath("sinogram", "txt", false, model, algo_string, geometry_string);
+    std::string p = getPath("phantom", "2D", "bmp", false, model);
+    std::string t = getPath("sinogram", "2D", "bmp", false, model, algo_string, geometry_string);
+    std::string target_txt_path = getPath("sinogram", "2D", "txt", false, model, algo_string, geometry_string);
 
-    std::string out_sino = getPath("out_sinogram", "bmp", true);
-    std::string out_diff_float = getPath("out_residual_float", "bmp", true);
-    std::string out_diff = getPath("out_residual", "bmp", true);
-    std::string out_delta_txt_path = getPath("delta", "txt", true);
-    std::string out_delta_symetry_txt_path = getPath("symetry_delta", "txt", true);
+    std::string out_sino = getPath("out_sinogram", "", "bmp", true);
+    std::string out_diff_float = getPath("out_residual_float", "", "bmp", true);
+    std::string out_diff = getPath("out_residual", "", "bmp", true);
+    std::string out_delta_txt_path = getPath("delta", "", "txt", true);
+    std::string out_delta_symetry_txt_path = getPath("symetry_delta", "", "txt", true);
 
     const char* const phantom_path = p.c_str();
     const char* const target_path = t.c_str();
@@ -255,6 +343,7 @@ void fullTest2D() {
     int size_x = phantom.width(), size_y = phantom.height();
     int detector_size = target.height(), angle_count = target.width();
     std::unique_ptr<float[]> img(new float[size_x * size_y]{});
+    std::cerr << model << " " << geometry_string << " " << algo_string << " " << size_x << " " << size_y << " " << size_z << std::endl;
 
     // copy first channel of image to array assuming grayscale bmp
     for (int i = 0; i < size_x; ++i) {
@@ -472,9 +561,141 @@ void fullTest2D() {
     //diff_percentage.save("out_residual_percentage.bmp");
 }
 
-int main()
-{   
-    //fullTest2D();
-    test3D();
+void test3D_self_projection(){
+    float delta_limit = 100000;
+
+    int detector_count_x = 256;
+    int detector_count_y = 21;
+    int angle_count = 90;
+    double distance_source  = 7000.0;
+    double distance_obj     = 500.0;
+    std::string model           = "model";
+    std::string algo_string     = "line";
+    std::string geometry_string = "par";
+    
+    std::string p = getPath("phantom", "2D", "txt", false, model);
+    std::ifstream input_phantom(p);
+    // read phantom
+    int size_x = 1, size_y = 1, size_z = 1;
+    input_phantom >> size_x >> size_y >> size_z;
+    std::cerr << model << " " << geometry_string << " " << algo_string << " " << size_x << " " << size_y << " " << size_z << std::endl;
+    std::unique_ptr<float[]> phantom2D(new float[size_x * size_y * size_z]{});
+    for (int k = 0; k < size_z; ++k) {
+        for (int j = 0; j < size_y; ++j) {
+            for (int i = 0; i < size_x; ++i) {
+                float a;
+                input_phantom >> a;
+                phantom2D[i + size_x * j + size_x * size_y * k] = a;
+            }
+        }
+    }
+    input_phantom.close();
+
+    size_z = 121;
+    std::unique_ptr<float[]> phantom3D(new float[size_x * size_y * size_z]{});
+    for (int k = 0; k < size_z; ++k) {
+        for (int j = 0; j < size_y; ++j) {
+            for (int i = 0; i < size_x; ++i) {
+                phantom3D[i + size_x * j + size_x * size_y * k] = phantom2D[i + size_x * j];
+            }
+        }
+    }
+
+    auto proj2D = getProjector("2D", angle_count, detector_count_x, 1,                model, algo_string, geometry_string, distance_source, distance_obj, std::move(phantom2D), size_x, size_y, 1);
+    auto proj3D = getProjector("3D", angle_count, detector_count_x, detector_count_y, "", "", geometry_string, distance_source, distance_obj, std::move(phantom3D), size_x, size_y, size_z);
+
+    std::string out_diff_float = getPath("out_residual_float", "", "bmp", true);
+    const char* const out_diff_float_path = out_diff_float.c_str();
+    std::string out_sino = getPath("out_sinogram", "", "bmp", true);
+    std::string out_sino_2D = getPath("out_sinogram_target", "", "bmp", true);
+
+    const char* const out_sino_path = out_sino.c_str();
+    const char* const out_sino_2D_path = out_sino_2D.c_str();
+
+    proj2D->buildFullProjection();
+    proj3D->buildFullProjection();
+
+    float max_val = 0.0f;
+    float total_max_delta = 0.0f;
+    double koeff = 1.0;
+    for (int k = 0; k < detector_count_y; ++k) {
+        if (geometry_string == "fan") {
+            double angle = std::atan((detector_count_y * 0.5 - k - 0.5) / (distance_source + distance_obj));
+            koeff = std::abs(std::cos(angle));
+        }
+        float delta = 0.0f;
+        float total_delta = 0.0f;
+        float out_delta = 1.0f, max_delta = 0.0f;
+        
+        for (int i = 0; i < angle_count; ++i) {
+            for (int j = 0; j < detector_count_x; ++j) {
+                float target = proj2D->fullProjection[j + i * detector_count_x];
+                float res = (proj3D->fullProjection[j + k * detector_count_x + i * detector_count_x * detector_count_y]) * koeff;
+                delta = target - res;
+                
+                if (std::abs(delta) > max_delta) {
+                    max_delta = std::abs(delta);
+                    out_delta = std::abs(delta) / std::max(res, target);
+                    total_max_delta = std::abs(delta);
+                }
+                if (res > max_val) {
+                    max_val = res;
+                }
+                float delta_sq = delta * delta;
+                total_delta += delta_sq;
+
+                //if (delta == 0)
+                //    continue;
+                if (std::abs(delta) > delta_limit) {
+                    std::cerr << "delta: " << delta << " target: " << target << " res: "
+                        << res << " det: " << j << " ang: " << i << std::endl;
+                    
+                }
+            }
+        }
+        float sigma = std::pow(total_delta / (angle_count * detector_count_x - 1), 0.5);
+        std::cout << "row: " << k << " sigma: " << sigma << " max_delta: " << max_delta << " delta/value: " << out_delta << std::endl;
+    }
+    std::cerr << "max_val: " << max_val << " total_max_delta: " << total_max_delta << std::endl;
+    unsigned char color[] = { 255 , 0, 0 };
+    unsigned char color2[] = { 0 };
+    cimg_library::CImg<unsigned char> diff(detector_count_y * angle_count, detector_count_x, 1, 3, 0);
+    cimg_library::CImg<unsigned char> sino(detector_count_y * angle_count, detector_count_x, 1, 1, 0);
+    cimg_library::CImg<unsigned char> sino_2D(detector_count_y * angle_count, detector_count_x, 1, 1, 0);
+    for (int k = 0; k < detector_count_y; ++k) {
+        if (geometry_string == "fan") {
+            double angle = std::atan((detector_count_y * 0.5 - k - 0.5) / (distance_source + distance_obj));
+            koeff = std::abs(std::cos(angle));
+        }
+        for (int i = 0; i < angle_count; ++i) {
+            for (int j = 0; j < detector_count_x; ++j) {
+                float target = proj2D->fullProjection[j + i * detector_count_x];
+                float res    = proj3D->fullProjection[j + k * detector_count_x + i * detector_count_x * detector_count_y] * koeff;
+                int g = res > target ? 0 : 1;
+                color[0] = 0;
+                color[1] = 0;
+                color[g] = std::abs(res - target)/total_max_delta * 255;
+                diff.draw_point(k + i * detector_count_y, j, color);
+                color2[0] = res / max_val * 255;
+                sino.draw_point(k + i * detector_count_y, j, color2);
+                color2[0] = target / max_val * 255;
+                sino_2D.draw_point(k + i * detector_count_y, j , color2);
+            }
+        }
+    }
+
+    diff.normalize(0, 255);
+    diff.save(out_diff_float_path);
+    sino.normalize(0, 255);
+    sino.save(out_sino_path);
+    sino_2D.normalize(0, 255);
+    sino_2D.save(out_sino_2D_path);
+
 }
 
+int main()
+{   
+    fullTest2D();
+    //test3D("model");
+    //test3D_self_projection();
+}

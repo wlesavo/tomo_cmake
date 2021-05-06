@@ -4,11 +4,11 @@
 
 Line::Line(double x1, double y1, double x2, double y2){
 	angle = std::atan2(y2 - y1, x2 - x1);
-	if (std::abs(std::cos(angle)) < 1e-10) {
+	if (std::abs(std::cos(angle)) < 1e-12) {
 		vert = true;
 		b = x1;
 	}
-	else if (std::abs(std::sin(angle)) < 1e-10) {
+	else if (std::abs(std::sin(angle)) < 1e-12) {
 		hor = true;
 		k = 0;
 		b = y1;
@@ -23,11 +23,11 @@ Line::Line(double x1, double y1, double x2, double y2){
 
 Line::Line(double x, double y, double i_angle){
 	angle = i_angle;
-	if (std::abs(std::cos(angle)) < 1e-10) {
+	if (std::abs(std::cos(angle)) < 1e-12) {
 		vert = true;
 		b = x;
 	}
-	else if (std::abs(std::sin(angle)) < 1e-10) {
+	else if (std::abs(std::sin(angle)) < 1e-12) {
 		hor = true;
 		k = 0;
 		b = y;
