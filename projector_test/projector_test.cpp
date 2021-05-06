@@ -4,6 +4,7 @@
 #include <fstream>
 #include <string>
 #include <projector_lib/Geometries.h>
+#include <chrono>
 
 std::vector<double> getAngles(double start, double end, int count) {
     std::vector<double> angles;
@@ -15,7 +16,7 @@ std::vector<double> getAngles(double start, double end, int count) {
 }
 
 std::string getPath(std::string type, std::string dim, std::string file_type, bool out = false, std::string model = "", std::string algo = "", std::string geometry = "") {
-    std::string out_string = "E:/test_proj/tomo_cmake/projector_test/";
+    std::string out_string = "D:/Projects/tomo_cmake/tomo_cmake/projector_test/";
     if (out) {
         out_string += "out_images/";
         if (type.size() > 0)
@@ -52,7 +53,9 @@ std::string getPath(std::string type, std::string dim, std::string file_type, bo
 std::unique_ptr<Projector> getProjector(std::string dim, int angle_count = 180, int detector_count_x = 256, int detector_count_y = 1
     , std::string model = "", std::string algo_string = "", std::string geometry_string = "", double distance_source = 7000.0, double distance_obj = 500.0, std::unique_ptr<float[]> input_img = nullptr
     , int size_x = 1, int size_y =1, int size_z = 1) {
-    bool exact = true;
+    bool exact = false;
+    if (algo_string == "fan")
+        bool exact = true;
     std::string type = "bmp";
     if (dim == "3D") {
         type = "txt";
@@ -693,9 +696,36 @@ void test3D_self_projection(){
 
 }
 
+void measure(std::string model, std::string algo_string, std::string geometry_string, std::string dim
+    , int detector_count_x, int detector_count_y, int angle_count) {
+    if (dim == "2D") {
+        detector_count_y = 1;
+    }
+    std::unique_ptr<Projector> proj = getProjector(dim, angle_count, detector_count_x, detector_count_y, model, algo_string, geometry_string);
+    auto start = std::chrono::high_resolution_clock::now();
+    proj->buildFullProjection();
+    auto end = std::chrono::high_resolution_clock::now();
+    auto time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    std::cerr << dim << " " << geometry_string << " " << algo_string << std::endl;
+    std::cerr << "img_size: " << proj->imgSize_x << " " << proj->imgSize_y << " " << proj->imgSize_z << std::endl;
+    std::cerr << "detector_size: " << detector_count_x << " " << detector_count_y << std::endl;
+    std::cerr << "angle_count: " << angle_count << std::endl;
+    std::cerr << "time ms: " << time_ms << std::endl;
+}   
+
+
 int main()
 {   
-    fullTest2D();
+    int detector_count_x = 512;
+    int detector_count_y = 128;
+    int angle_count = 180;
+    std::string model = "phantom";
+    std::string algo_string = "area";
+    std::string geometry_string = "fan";
+    std::string dim = "2D";
+
+    measure(model, algo_string, geometry_string, dim, detector_count_x, detector_count_y, angle_count);
+    //fullTest2D();
     //test3D("model");
     //test3D_self_projection();
 }

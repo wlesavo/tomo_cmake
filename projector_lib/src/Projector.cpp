@@ -230,7 +230,6 @@ double Projector::singlePixelArea(int pixel_i, int pixel_j, const Line& line) co
 
 float Projector::manyPixelArea(int i_min, int i_max, int j, bool upper, const Line& line) const {
 
-
 	float sum = 0.0f;
 	int size_x = line.transpose ? imgSize_y : imgSize_x;
 	int size_y = line.transpose ? imgSize_x : imgSize_y;
@@ -242,23 +241,15 @@ float Projector::manyPixelArea(int i_min, int i_max, int j, bool upper, const Li
 	if (i_max >= size_x)
 		i_max = size_x;
 	for (int i = i_min; i < i_max; i++) {
-		if (upper) {
-			float a = inputImg.get(i, j, line.transpose, line.reverse_x);
-			if (a == 0.0f) {
-				continue;
-			}
-			double b = singlePixelArea(i, j, line);
-			sum += a * b;
-			//sum += singlePixelArea(i, j, line) * inputImg.get(i, j, line.transpose, line.reverse_x);
+		float a = inputImg.get(i, j, line.transpose, line.reverse_x);
+		if (a == 0.0f) {
+			continue;
 		}
-		else if (!upper) {
-			float a = inputImg.get(i, j, line.transpose, line.reverse_x);
-			if (a == 0.0f) {
-				continue;
-			}
-			double b = (1.0 - singlePixelArea(i, j, line));
-			sum += a * b;
+		double b = singlePixelArea(i, j, line);
+		if (!upper) {
+			b = 1.0 - b;
 		}
+		sum += a * b;
 	}
 	return sum;	
 }
@@ -534,7 +525,7 @@ float Projector::sumArea(const Line& line_1, const Line& line_2) const {
 
 		left = std::min({ x_left_1, x_right_1, x_left_2, x_right_2 });
 		right = std::max({ x_left_1, x_right_1, x_left_2, x_right_2 });
-		
+
 		sum2 = manyPixelArea(std::floor(left), std::floor(right) + 1, j, sign_1, line_1);
 		sum3 = manyPixelArea(std::floor(left), std::floor(right) + 1, j, sign_2, line_2);
 		sum += std::abs(sum2 - sum3);
