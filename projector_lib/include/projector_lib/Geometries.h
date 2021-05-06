@@ -7,25 +7,33 @@
 class GeometryFanBeam : public Geometry {
 public:
 
-	GeometryFanBeam(const std::vector<double>& i_angles, int i_detectorCount, double i_detectorSize, double i_dSourceToObj, double i_dObjToDetector, double imgCenterX, double imgCenterY) :
-		Geometry(i_angles, i_detectorCount, 1, i_detectorSize, i_dSourceToObj, i_dObjToDetector, imgCenterX, imgCenterY, 0)
-	{
-		// precalculating distances and angles for pixels of detector matrix
-		// in experiment pixels are rotating around origin with new distance and initial angle
-		double delta_angle = std::atan2(0.5 - 0.0, i_dSourceToObj + i_dObjToDetector);
-		double d1 = (i_dSourceToObj - imgCenterX);
-		double d2 = (i_dSourceToObj + imgCenterX);
-		part = (1 - (d2 * d2 - d1 * d1) * std::sin(delta_angle) / (imgCenterX * 2)) / 2;
+	std::vector<double> distanceToDetectorPixelLeft, angleToDetectorPixelLeft;
+	std::vector<double> distanceToDetectorPixelRight, angleToDetectorPixelRight;
 
-		double center = (detectorCount) * 0.5 * detectorSize;
-		for (int i = 0; i < detectorCount; ++i) {
+	GeometryFanBeam(const std::vector<double>& angles, int nDetectors, double detectorSize, double dSourceToObj, double dObjToDetector, double imgCenterX, double imgCenterY) :
+		Geometry(angles, nDetectors, 1, detectorSize, dSourceToObj, dObjToDetector, imgCenterX, imgCenterY, 0)
+	{
+		// Precalculating distances and angles for pixels of detector matrix.
+		// In the experiment pixels are rotating around origin with new distance and initial angle.
+		// Vectors Left and Right are used for approximation of parallel beam with the same area
+		// as original fan beam.
+
+		double delta_angle = std::atan2(0.5 - 0.0, dSourceToObj + dObjToDetector);
+		double d1 = (dSourceToObj - imgCenterX);
+		double d2 = (dSourceToObj + imgCenterX);
+		double part = (1 - (d2 * d2 - d1 * d1) * std::sin(delta_angle) / (imgCenterX * 2)) / 2;
+
+		double center = (nDetectors) * 0.5 * detectorSize;
+		
+		for (int i = 0; i < nDetectors; ++i) {
 			double det_y = center - detectorSize * (i + 0.5);
 			double dist = std::pow(dObjToDetector * dObjToDetector + det_y * det_y, 0.5);
 			double angle = std::atan2(-det_y, dObjToDetector);
 			distanceToDetectorPixelCenter.push_back(dist);
 			angleToDetectorPixelCenter.push_back(angle);
 		}
-		for (int i = 0; i < detectorCount + 1; ++i) {
+		
+		for (int i = 0; i < nDetectors + 1; ++i) {
 			double det_y = center - detectorSize * (i);
 			double dist = std::pow(dObjToDetector * dObjToDetector + det_y * det_y, 0.5);
 			double angle = std::atan2(-det_y, dObjToDetector);
@@ -33,7 +41,7 @@ public:
 			angleToDetectorPixel.push_back(angle);
 		}
 
-		for (int i = 0; i < detectorCount; ++i) {
+		for (int i = 0; i < nDetectors; ++i) {
 			double det_y = center - detectorSize * (i + part);
 			//double det_y = center - detectorSize * (i);
 			double dist = std::pow(dObjToDetector * dObjToDetector + det_y * det_y, 0.5);
@@ -50,33 +58,34 @@ public:
 
 	}
 
-	virtual Line v_GetNextLineCenter(int i_angle, int detector_i) {
-		double angle = M_PI - angles[i_angle];
+	virtual Line getLine(int angleIndex, int detectorIndex) {
+
+		double angle = M_PI - angles[angleIndex];
 		double x_source = - dSourceToObj * std::sin(angle) + imgCenterX;
-		double y_source = dSourceToObj * std::cos(angle) + imgCenterY;
-		double x_det = - distanceToDetectorPixelCenter[detector_i] * std::sin(M_PI + angle + angleToDetectorPixelCenter[detector_i]) + imgCenterX;
-		double y_det = distanceToDetectorPixelCenter[detector_i] * std::cos(M_PI + angle + angleToDetectorPixelCenter[detector_i]) + imgCenterY;
+		double y_source =   dSourceToObj * std::cos(angle) + imgCenterY;
+		double x_det = - distanceToDetectorPixelCenter[detectorIndex] * std::sin(M_PI + angle + angleToDetectorPixelCenter[detectorIndex]) + imgCenterX;
+		double y_det =	 distanceToDetectorPixelCenter[detectorIndex] * std::cos(M_PI + angle + angleToDetectorPixelCenter[detectorIndex]) + imgCenterY;
 		return Line(x_source, y_source, x_det, y_det);
 	};
 
-	virtual std::pair<Line, Line> v_GetNextLinePair(int i_angle, int detector_i, bool parallel = true) {
-		double angle = angles[i_angle];
-		if (parallel) {
-			Line line = v_GetNextLineCenter(i_angle, detector_i);
-			double x_det1 = distanceToDetectorPixelLeft[detector_i] * std::sin(angle - angleToDetectorPixelLeft[detector_i]) + imgCenterX;
-			double y_det1 = distanceToDetectorPixelLeft[detector_i] * std::cos(angle - angleToDetectorPixelLeft[detector_i]) + imgCenterY;
-			double x_det2 = distanceToDetectorPixelRight[detector_i] * std::sin(angle - angleToDetectorPixelRight[detector_i]) + imgCenterX;
-			double y_det2 = distanceToDetectorPixelRight[detector_i] * std::cos(angle - angleToDetectorPixelRight[detector_i]) + imgCenterY;
-			return std::pair<Line, Line>(Line(x_det1, y_det1, line.angle), Line(x_det2, y_det2, line.angle));
-		}
-		if (!parallel) {
+	virtual std::pair<Line, Line> getLinePair(int angleIndex, int detectorIndex, bool isParallel = false) {
+		double angle = angles[angleIndex];
+		if (!isParallel) {
 			double x_source = -dSourceToObj * std::sin(angle) + imgCenterX;
 			double y_source = -dSourceToObj * std::cos(angle) + imgCenterY;
-			double x_det1 = distanceToDetectorPixel[detector_i] * std::sin(angle - angleToDetectorPixel[detector_i]) + imgCenterX;
-			double y_det1 = distanceToDetectorPixel[detector_i] * std::cos(angle - angleToDetectorPixel[detector_i]) + imgCenterY;
-			double x_det2 = distanceToDetectorPixel[detector_i+1] * std::sin(angle - angleToDetectorPixel[detector_i+1]) + imgCenterX;
-			double y_det2 = distanceToDetectorPixel[detector_i+1] * std::cos(angle - angleToDetectorPixel[detector_i+1]) + imgCenterY;
+			double x_det1 = distanceToDetectorPixel[detectorIndex] * std::sin(angle - angleToDetectorPixel[detectorIndex]) + imgCenterX;
+			double y_det1 = distanceToDetectorPixel[detectorIndex] * std::cos(angle - angleToDetectorPixel[detectorIndex]) + imgCenterY;
+			double x_det2 = distanceToDetectorPixel[detectorIndex + 1] * std::sin(angle - angleToDetectorPixel[detectorIndex + 1]) + imgCenterX;
+			double y_det2 = distanceToDetectorPixel[detectorIndex + 1] * std::cos(angle - angleToDetectorPixel[detectorIndex + 1]) + imgCenterY;
 			return std::pair<Line, Line>(Line(x_source, y_source, x_det1, y_det1), Line(x_source, y_source, x_det2, y_det2));
+		}
+		else if (isParallel) {
+			Line line = getLine(angleIndex, detectorIndex);
+			double x_det1 = distanceToDetectorPixelLeft[detectorIndex] * std::sin(angle - angleToDetectorPixelLeft[detectorIndex]) + imgCenterX;
+			double y_det1 = distanceToDetectorPixelLeft[detectorIndex] * std::cos(angle - angleToDetectorPixelLeft[detectorIndex]) + imgCenterY;
+			double x_det2 = distanceToDetectorPixelRight[detectorIndex] * std::sin(angle - angleToDetectorPixelRight[detectorIndex]) + imgCenterX;
+			double y_det2 = distanceToDetectorPixelRight[detectorIndex] * std::cos(angle - angleToDetectorPixelRight[detectorIndex]) + imgCenterY;
+			return std::pair<Line, Line>(Line(x_det1, y_det1, line.angle), Line(x_det2, y_det2, line.angle));
 		}
 	};
 
@@ -84,37 +93,37 @@ public:
 
 class GeometryParallel : public Geometry {
 public:
-	GeometryParallel(const std::vector<double>& i_angles, int i_detectorCount, double i_detectorSize, double imgCenterX, double imgCenterY) :
-		Geometry(i_angles, i_detectorCount, 1, i_detectorSize, 0, 0, imgCenterX, imgCenterY, 0)
+	GeometryParallel(const std::vector<double>& angles, int nDetectors, double detectorSize, double imgCenterX, double imgCenterY) :
+		Geometry(angles, nDetectors, 1, detectorSize, 0, 0, imgCenterX, imgCenterY, 0)
 	{
-		// precalculating distances and angles for pixels of detector matrix
-		// in experiment pixels are rotating around origin with new distance and initial angle
+		// Precalculating distances and angles for pixels of detector matrix.
+		// In the experiment pixels are rotating around origin with new distance and initial angle.
 
-		double center = (detectorCount) * 0.5 * detectorSize;
-		for (int i = 0; i < detectorCount; ++i) {
+		double center = (nDetectors) * 0.5 * detectorSize;
+		for (int i = 0; i < nDetectors; ++i) {
 			double det_y = detectorSize * (i + 0.5 - center);
 			distanceToDetectorPixelCenter.push_back(det_y);
 		}
 
-		for (int i = 0; i < detectorCount + 1; ++i) {
+		for (int i = 0; i < nDetectors + 1; ++i) {
 			double det_y = detectorSize * (i - center);
 			distanceToDetectorPixel.push_back(det_y);
 		}
 	}
 
-	virtual Line v_GetNextLineCenter(int i_angle, int detector_i) {
-		double angle = angles[i_angle];
-		double x_det = distanceToDetectorPixelCenter[detector_i] * std::cos(-angle) + imgCenterX;
-		double y_det = distanceToDetectorPixelCenter[detector_i] * std::sin(-angle) + imgCenterY;
+	virtual Line getLine(int angleIndex, int detectorIndex) {
+		double angle = angles[angleIndex];
+		double x_det = distanceToDetectorPixelCenter[detectorIndex] * std::cos(-angle) + imgCenterX;
+		double y_det = distanceToDetectorPixelCenter[detectorIndex] * std::sin(-angle) + imgCenterY;
 		return Line(x_det, y_det, M_PI_2 - angle);
 	};
 
-	virtual std::pair<Line, Line> v_GetNextLinePair(int i_angle, int detector_i, bool parallel = true) {
-		double angle = angles[i_angle];
-		double x_det1 = distanceToDetectorPixel[detector_i] * std::cos(-angle) + imgCenterX;
-		double y_det1 = distanceToDetectorPixel[detector_i] * std::sin(-angle) + imgCenterY;
-		double x_det2 = distanceToDetectorPixel[detector_i+1] * std::cos(-angle) + imgCenterX;
-		double y_det2 = distanceToDetectorPixel[detector_i+1] * std::sin(-angle) + imgCenterY;
+	virtual std::pair<Line, Line> getLinePair(int angleIndex, int detectorIndex, bool isParallel = true) {
+		double angle = angles[angleIndex];
+		double x_det1 = distanceToDetectorPixel[detectorIndex] * std::cos(-angle) + imgCenterX;
+		double y_det1 = distanceToDetectorPixel[detectorIndex] * std::sin(-angle) + imgCenterY;
+		double x_det2 = distanceToDetectorPixel[detectorIndex + 1] * std::cos(-angle) + imgCenterX;
+		double y_det2 = distanceToDetectorPixel[detectorIndex + 1] * std::sin(-angle) + imgCenterY;
 		return std::pair<Line, Line>(Line(x_det1, y_det1, M_PI_2 - angle), Line(x_det2, y_det2, M_PI_2 - angle));
 	};
 
@@ -123,14 +132,14 @@ public:
 class GeometryFanBeam3D : public Geometry {
 public:
 
-	GeometryFanBeam3D(const std::vector<double>& i_angles, int i_detectorCount_x, int i_detectorCount_y, double i_detectorSize, double i_dSourceToObj, double i_dObjToDetector, double imgCenterX, double imgCenterY, double imgCenterZ) :
-		Geometry(i_angles, i_detectorCount_x, i_detectorCount_y, i_detectorSize, i_dSourceToObj, i_dObjToDetector, imgCenterX, imgCenterY, imgCenterZ)
+	GeometryFanBeam3D(const std::vector<double>& angles, int nDetectorsX, int nDetectorsY, double detectorSize, double dSourceToObj, double dObjToDetector, double imgCenterX, double imgCenterY, double imgCenterZ) :
+		Geometry(angles, nDetectorsX, nDetectorsY, detectorSize, dSourceToObj, dObjToDetector, imgCenterX, imgCenterY, imgCenterZ)
 	{
-		// precalculating distances and angles for pixels of detector matrix
-		// in experiment pixels are rotating around origin with new distance and initial angle
-		
-		double center = (detectorCount_x) * 0.5 * detectorSize;
-		for (int i = 0; i < detectorCount_x; ++i) {
+		// Precalculating distances and angles for pixels of detector matrix.
+		// In the experiment pixels are rotating around origin with new distance and initial angle.
+
+		double center = (nDetectorsX) * 0.5 * detectorSize;
+		for (int i = 0; i < nDetectorsX; ++i) {
 			double det_y = center - detectorSize * (i + 0.5);
 			double dist = std::pow(dObjToDetector * dObjToDetector + det_y * det_y, 0.5);
 			double angle = std::atan2(-det_y, dObjToDetector);
@@ -140,20 +149,20 @@ public:
 
 	}
 
-	virtual Line v_GetNextLineCenter(int i_angle, int detector) {
-		int detector_i = detector % detectorCount_x;
-		int detector_j = detector / detectorCount_x;
-		double angle = M_PI - angles[i_angle];
-		double x_source = -dSourceToObj * std::sin(angle) + imgCenterX;
-		double y_source = dSourceToObj * std::cos(angle) + imgCenterY;
+	virtual Line getLine(int angleIndex, int detectorIndex) {
+		int detector_i = detectorIndex % nDetectorsX;
+		int detector_j = detectorIndex / nDetectorsX;
+		double angle = M_PI - angles[angleIndex];
+		double x_source = - dSourceToObj * std::sin(angle) + imgCenterX;
+		double y_source =   dSourceToObj * std::cos(angle) + imgCenterY;
 		double z_source = imgCenterZ;
-		double x_det = -distanceToDetectorPixelCenter[detector_i] * std::sin(M_PI + angle + angleToDetectorPixelCenter[detector_i]) + imgCenterX;
-		double y_det = distanceToDetectorPixelCenter[detector_i] * std::cos(M_PI + angle + angleToDetectorPixelCenter[detector_i]) + imgCenterY;
-		double z_det = detectorSize * (detectorCount_y * 0.5 - (detector_j + 0.5)) + imgCenterZ;
+		double x_det = - distanceToDetectorPixelCenter[detector_i] * std::sin(M_PI + angle + angleToDetectorPixelCenter[detector_i]) + imgCenterX;
+		double y_det =   distanceToDetectorPixelCenter[detector_i] * std::cos(M_PI + angle + angleToDetectorPixelCenter[detector_i]) + imgCenterY;
+		double z_det = detectorSize * (nDetectorsY * 0.5 - (detector_j + 0.5)) + imgCenterZ;
 		return Line(x_source, y_source, z_source, x_det, y_det, z_det);
 	};
 
-	virtual std::pair<Line, Line> v_GetNextLinePair(int i_angle, int detector_i, bool parallel = true) {
+	virtual std::pair<Line, Line> getLinePair(int angleIndex, int detectorIndex, bool isParallel = true) {
 		return std::pair<Line, Line>(Line(), Line());		
 	};
 };
@@ -161,26 +170,27 @@ public:
 class GeometryParallel3D : public Geometry {
 public:
 
-	GeometryParallel3D(const std::vector<double>& i_angles, int i_detectorCount_x, int i_detectorCount_y, double i_detectorSize, double imgCenterX, double imgCenterY, double imgCenterZ) :
-		Geometry(i_angles, i_detectorCount_x, i_detectorCount_y, i_detectorSize, 0.0, 0.0, imgCenterX, imgCenterY, imgCenterZ)
+	GeometryParallel3D(const std::vector<double>& angles, int nDetectorsX, int nDetectorsY, double detectorSize, double imgCenterX, double imgCenterY, double imgCenterZ) :
+		Geometry(angles, nDetectorsX, nDetectorsY, detectorSize, 0.0, 0.0, imgCenterX, imgCenterY, imgCenterZ)
 	{
-		// precalculating distances and angles for pixels of detector matrix
-		// in experiment pixels are rotating around origin with new distance and initial angle
-		double center = (detectorCount_x) * 0.5 * detectorSize;
-		for (int i = 0; i < detectorCount_x; ++i) {
-			double det_y = detectorSize * ((i + 0.5)-center);
+		// Precalculating distances and angles for pixels of detector matrix.
+		// In the experiment pixels are rotating around origin with new distance and initial angle.
+
+		double center = (nDetectorsX) * 0.5 * detectorSize;
+		for (int i = 0; i < nDetectorsX; ++i) {
+			double det_y = detectorSize * ((i + 0.5) - center);
 			distanceToDetectorPixelCenter.push_back(det_y);
 		}
 	}
 
-	virtual Line v_GetNextLineCenter(int i_angle, int detector) {
-		double angle = -angles[i_angle];
-		double x_det = distanceToDetectorPixelCenter[detector] * std::cos(-angle) + imgCenterX;
-		double y_det = distanceToDetectorPixelCenter[detector] * std::sin(-angle) + imgCenterY;
+	virtual Line getLine(int angleIndex, int detectorIndex) {
+		double angle = - angles[angleIndex];
+		double x_det = distanceToDetectorPixelCenter[detectorIndex] * std::cos(-angle) + imgCenterX;
+		double y_det = distanceToDetectorPixelCenter[detectorIndex] * std::sin(-angle) + imgCenterY;
 		return Line(x_det, y_det, M_PI_2 - angle);
 	};
 
-	virtual std::pair<Line, Line> v_GetNextLinePair(int i_angle, int detector_i, bool parallel = true) {
+	virtual std::pair<Line, Line> getLinePair(int angleIndex, int detectorIndex, bool isParallel = true) {
 		return std::pair<Line, Line>(Line(), Line());
 	};
 

@@ -5,11 +5,11 @@
 Line::Line(double x1, double y1, double x2, double y2){
 	angle = std::atan2(y2 - y1, x2 - x1);
 	if (std::abs(std::cos(angle)) < 1e-12) {
-		vert = true;
+		isVertical = true;
 		b = x1;
 	}
 	else if (std::abs(std::sin(angle)) < 1e-12) {
-		hor = true;
+		isHorizontal = true;
 		k = 0;
 		b = y1;
 	}
@@ -24,11 +24,11 @@ Line::Line(double x1, double y1, double x2, double y2){
 Line::Line(double x, double y, double i_angle){
 	angle = i_angle;
 	if (std::abs(std::cos(angle)) < 1e-12) {
-		vert = true;
+		isVertical = true;
 		b = x;
 	}
 	else if (std::abs(std::sin(angle)) < 1e-12) {
-		hor = true;
+		isHorizontal = true;
 		k = 0;
 		b = y;
 	}
@@ -56,7 +56,7 @@ Line::Line(double x1, double y1, double z1, double x2, double y2, double z2) {
 }
 
 Line::Line(const Line& line) : transpose(line.transpose), reverse_x(line.reverse_x), reverse_y(line.reverse_y), reverse_z(line.reverse_z)
-	, vert(line.vert), hor(line.hor), angle(line.angle), k(line.k), b(line.b), reverse_k(line.reverse_k), reverse_ab(line.reverse_ab),
+	, isVertical(line.isVertical), isHorizontal(line.isHorizontal), angle(line.angle), k(line.k), b(line.b), reverse_k(line.reverse_k), reverse_ab(line.reverse_ab),
 	kx(line.kx), ky(line.ky), kz(line.kz), x0(line.x0), y0(line.y0), z0(line.z0)
 {}
 

@@ -3,7 +3,7 @@
 class Point {
 public:
 	double x, y, z;
-	Point(double i_x, double i_y, double i_z = 0) : x(i_x), y(i_y), z(i_z){};
-	Point() : x(-999), y(-999), z(0) {};
+	Point(double x, double y, double z = 0.0) : x(x), y(y), z(z){};
+	Point() : x(-999.0), y(-999.0), z(0.0) {};
 };
 #endif

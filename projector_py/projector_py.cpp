@@ -33,7 +33,7 @@ PROJECTOR_API struct Projector* projector_create(float* inputImg, int imgSize_x,
 	size_t size = static_cast<size_t>(imgSize_x) * imgSize_y;
 	std::unique_ptr<float[]> img(new float[size]);
 	std::copy(inputImg, inputImg + size, img.get());
-	return new Projector(std::move(img), *reinterpret_cast<std::shared_ptr<Geometry>*>(geometry), reinterpret_cast<SumAlgo&>(sumAlgorithm), imgSize_x, imgSize_y);
+	return new Projector(std::move(img), *reinterpret_cast<std::shared_ptr<Geometry>*>(geometry), reinterpret_cast<SumAlgorithm&>(sumAlgorithm), imgSize_x, imgSize_y);
 }
 
 PROJECTOR_API void projector_free(struct Projector* projector) {
@@ -44,13 +44,13 @@ PROJECTOR_API void projector_free(struct Projector* projector) {
 
 PROJECTOR_API void projector_get_full_projection(float** out, size_t* out_size_x, size_t* out_size_y, struct Projector* projector) {
 	*out = projector->getFullProjection().release();
-	*out_size_x = static_cast<size_t>(projector->geometry->detectorCount);
+	*out_size_x = static_cast<size_t>(projector->geometry->nDetectors);
 	*out_size_y = static_cast<size_t>(projector->geometry->angles.size());
 }
 
 PROJECTOR_API void projector_get_single_projection(float** out, size_t* out_size, struct Projector* projector, int angle) {
 	*out = projector->getSingleProjection(angle).release();
-	*out_size = static_cast<size_t>(projector->geometry->detectorCount);
+	*out_size = static_cast<size_t>(projector->geometry->nDetectors);
 }
 
 PROJECTOR_API void float_free(float* f) {

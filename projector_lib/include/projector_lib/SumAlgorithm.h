@@ -1,6 +1,6 @@
 #ifndef _SUMALGO_
 #define _SUMALGO_
-enum class SumAlgo {
+enum class SumAlgorithm {
 	LINE,
 	AREA,
 	AREA_EXACT,

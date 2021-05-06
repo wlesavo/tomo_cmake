@@ -64,7 +64,7 @@ std::unique_ptr<Projector> getProjector(std::string dim, int angle_count = 180, 
     std::string p = getPath("phantom", dim, type, false, model);
     std::vector<double> angles = getAngles(0, M_PI, angle_count);
     std::shared_ptr<Geometry> input_geometry = nullptr;
-    auto sum_algo = SumAlgo::LINE;
+    auto sum_algo = SumAlgorithm::LINE;
     std::unique_ptr<float[]> img;
     if (input_img) {
         img = std::move(input_img);
@@ -86,12 +86,12 @@ std::unique_ptr<Projector> getProjector(std::string dim, int angle_count = 180, 
         }
         if (algo_string == "area") {
             if (exact)
-                sum_algo = SumAlgo::AREA_EXACT;
+                sum_algo = SumAlgorithm::AREA_EXACT;
             else
-                sum_algo = SumAlgo::AREA;
+                sum_algo = SumAlgorithm::AREA;
         }
         else if (algo_string == "line") {
-            sum_algo = SumAlgo::LINE;
+            sum_algo = SumAlgorithm::LINE;
         }
         if (geometry_string == "fan") {
             input_geometry = std::move(std::make_shared<GeometryFanBeam>(GeometryFanBeam(angles, detector_count_x, 1.0, distance_source, distance_obj, size_x * 0.5, size_y * 0.5)));
@@ -121,11 +121,11 @@ std::unique_ptr<Projector> getProjector(std::string dim, int angle_count = 180, 
         }
         if (geometry_string == "fan") {
             input_geometry = std::move(std::make_shared<GeometryFanBeam3D>(GeometryFanBeam3D(angles, detector_count_x, detector_count_y, 1.0, distance_source, distance_obj, size_x * 0.5, size_y * 0.5, size_z * 0.5)));
-            sum_algo = SumAlgo::LINE3DFAN;
+            sum_algo = SumAlgorithm::LINE3DFAN;
         }
         if (geometry_string == "par") {
             input_geometry = std::move(std::make_shared<GeometryParallel3D>(GeometryParallel3D(angles, detector_count_x, detector_count_y, 1.0, size_x * 0.5, size_y * 0.5, size_z * 0.5)));
-            sum_algo = SumAlgo::LINE3DPARALLEL;
+            sum_algo = SumAlgorithm::LINE3DPARALLEL;
         }
     }
 
@@ -158,14 +158,14 @@ void customLineProjections() {
 
         input_f.close();
         Projector myProj(std::move(img), std::make_shared<GeometryParallel>(GeometryParallel(angles, detector_size, 1.0, size_x * 0.5, size_y * 0.5))
-            , SumAlgo::LINE, size_x, size_y);
+            , SumAlgorithm::LINE, size_x, size_y);
         std::ofstream output_f("phantom\\out_sino\\" + s + "_small.txt");
         //std::ofstream output_f("phantom\\out_sino\\" + s + "_large.txt");
         output_f.setf(std::ios::scientific);
         output_f.precision(std::numeric_limits<double>::digits10 + 1);
         for (int i = 0; i < angle_count; ++i) {
             for (int j = 0; j < detector_size; ++j) {
-                Line line = myProj.geometry->v_GetNextLineCenter(angles[i], j);
+                Line line = myProj.geometry->getLine(angles[i], j);
                 float sum = myProj.sumLine(line);
                 float x1 = 0.0f, x2 = 256.0f;
                 float y1 = line.value(x1), y2 = line.value(x2);
@@ -179,13 +179,13 @@ void customLineProjections() {
                 x2 -= size_x * 0.5f;
                 y1 -= size_y * 0.5f;
                 y2 -= size_y * 0.5f;
-                if (line.vert) {
+                if (line.isVertical) {
                     x1 = line.b - size_x * 0.5f;
                     x2 = line.b - size_x * 0.5f;
                     y1 =        - size_y * 0.5f;
                     y2 =          size_y * 0.5f;
                 }
-                if (line.hor) {
+                if (line.isHorizontal) {
                     x1 =        - size_x * 0.5f;
                     x2 =          size_x * 0.5f;
                     y1 = line.b - size_y * 0.5f;
@@ -245,7 +245,7 @@ void test3D(std::string model) {
     std::vector<double> angles = getAngles(0.0, M_PI, angle_count);
     std::shared_ptr<Geometry> input_geometry = nullptr;
     input_geometry = std::move(std::make_shared<GeometryFanBeam3D>(GeometryFanBeam3D(angles, detector_size_x, detector_size_y, 1.0, distance_source, distance_obj, size_x * 0.5, size_y * 0.5, size_z * 0.5)));
-    Projector proj(std::move(img), input_geometry, SumAlgo::LINE3DFAN, size_x, size_y, size_z);
+    Projector proj(std::move(img), input_geometry, SumAlgorithm::LINE3DFAN, size_x, size_y, size_z);
     proj.buildFullProjection();
 
     // count sigma and max delta
@@ -368,15 +368,15 @@ void fullTest2D() {
         angles.push_back((double)(i)*M_PI / 180.0);
     }
 
-    auto sum_algo = SumAlgo::LINE;
+    auto sum_algo = SumAlgorithm::LINE;
     if (algo_string == "area") {
         if (exact)
-            sum_algo = SumAlgo::AREA_EXACT;
+            sum_algo = SumAlgorithm::AREA_EXACT;
         else
-            sum_algo = SumAlgo::AREA;
+            sum_algo = SumAlgorithm::AREA;
     }
     else if (algo_string == "line") {
-        sum_algo = SumAlgo::LINE;
+        sum_algo = SumAlgorithm::LINE;
     }
     std::shared_ptr<Geometry> input_geometry = nullptr;
     if (geometry_string == "fan") {
@@ -482,7 +482,7 @@ void fullTest2D() {
                 std::cout << "delta: " << delta << " target: " << delta1 << " res: " << delta2 << std::endl;
             }
             if (std::abs(delta) > 0) {
-                Line line = myProj.geometry->v_GetNextLineCenter(myProj.geometry->angles[i], j);
+                Line line = myProj.geometry->getLine(myProj.geometry->angles[i], j);
 
                 output_f << delta << " " << target_f[i * detector_size + j] << " "
                     << myProj.fullProjection[i * detector_size + j] << std::endl;
@@ -519,12 +519,12 @@ void fullTest2D() {
             }
             int detector, angle_i;
             if (std::abs(t_direct - r_direct) > std::abs(t_sym - r_sym)) {
-                line = myProj.geometry->v_GetNextLineCenter(i, j);
+                line = myProj.geometry->getLine(i, j);
                 detector = j;
                 angle_i = i;
             }
             else {
-                line = myProj.geometry->v_GetNextLineCenter((i + 180), detector_size - j - 1);
+                line = myProj.geometry->getLine((i + 180), detector_size - j - 1);
                 detector = detector_size - j - 1;
                 angle_i = 180 + i;
             }
@@ -716,11 +716,11 @@ void measure(std::string model, std::string algo_string, std::string geometry_st
 
 int main()
 {   
-    int detector_count_x = 512;
+    int detector_count_x = 128;
     int detector_count_y = 128;
     int angle_count = 180;
     std::string model = "phantom";
-    std::string algo_string = "area";
+    std::string algo_string = "line";
     std::string geometry_string = "fan";
     std::string dim = "2D";
 

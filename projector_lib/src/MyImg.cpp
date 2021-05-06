@@ -1,13 +1,12 @@
 #include <projector_lib/MyImg.h>
 #include <iostream>
 
-MyImg::MyImg(std::unique_ptr<float[]> i_inputImg, int i_size_x, int i_size_y, int i_size_z)
-	: size_x(i_size_x), size_y(i_size_y), size_z(i_size_z), inputImg(std::move(i_inputImg))
-	, center_x(i_size_x * 0.5), center_y(i_size_y * 0.5), center_z(i_size_z * 0.5)
+MyImg::MyImg(std::unique_ptr<float[]> inputImg, int size_x, int size_y, int size_z)
+	: size_x(size_x), size_y(size_y), size_z(size_z), inputImg(std::move(inputImg))
+	, center_x(size_x * 0.5), center_y(size_y * 0.5), center_z(size_z * 0.5)
 {};
 
-float MyImg::get(int i, int j, bool transpose, bool reverse_x, bool reverse_y, int slice) const{
-
+float MyImg::get(int i, int j, bool transpose, bool reverse_x, bool reverse_y, int slice) const {
 	if (transpose) {
 		int a = j;
 		j = i;

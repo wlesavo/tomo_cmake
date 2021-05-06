@@ -6,7 +6,7 @@ include/projector_lib/Geometry.h
 include/projector_lib/Line.h 
 include/projector_lib/Point.h 
 include/projector_lib/Projector.hpp 
-include/projector_lib/SumAlgo.h
+include/projector_lib/SumAlgorithm.h
 include/projector_lib/MyImg.h
 src/Line.cpp
 src/MyImg.cpp
