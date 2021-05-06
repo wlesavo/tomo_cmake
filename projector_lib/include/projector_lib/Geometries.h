@@ -150,7 +150,7 @@ public:
 		double z_source = imgCenterZ;
 		double x_det = -distanceToDetectorPixelCenter[detector_i] * std::sin(M_PI + angle + angleToDetectorPixelCenter[detector_i]) + imgCenterX;
 		double y_det = distanceToDetectorPixelCenter[detector_i] * std::cos(M_PI + angle + angleToDetectorPixelCenter[detector_i]) + imgCenterY;
-		double z_det = detectorSize * (detectorCount_y * 0.5 - (detector_j + 1)) + imgCenterZ;
+		double z_det = detectorSize * (detectorCount_y * 0.5 - (detector_j + 0.5)) + imgCenterZ;
 		return Line(x_source, y_source, z_source, x_det, y_det, z_det);
 	};
 

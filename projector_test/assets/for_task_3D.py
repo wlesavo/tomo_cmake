@@ -35,29 +35,30 @@ def main():
     sinogram_txt_path = "sinogram_3D"+".txt"
     
     size_x, size_y, size_z = (256, 256, 20);
-    detector_size_x, detector_size_y = (40, 30)
+    detector_size_x, detector_size_y = (256, 40)
+    #detector_size_x, detector_size_y = (40, 30)
     angles = np.linspace(0, np.pi, 10, False)
     
-    source_object = 7000
-    object_det = 500
+    source_object = 200
+    object_det = 200
     im = Image.open(phantom_path)
     phantom2D = np.zeros((size_x, size_y))
     pixels = im.load()
     for j in range(size_y):
         for i in range(size_x):
             phantom2D[i, j] = pixels[i, j]
-    size_x, size_y, size_z = (100, 50, 20);
+    #size_x, size_y, size_z = (100, 50, 20);
     phantom = np.zeros((size_z, size_y, size_x, ))
-    #for k in range(size_z):
-    #    phantom[k,:,:] = phantom2D     
-    phantom[5:6, 5:6, 5:6]       = 10
-    phantom[-6:-5, 5:6, 5:6]   = 20
-    phantom[5:6, -6:-5, 5:6]     = 30
-    phantom[-6:-5, -6:-5, 5:6] = 40
-    phantom[5:6, 5:6, -6:-5]       = 50
-    phantom[-6:-5, 5:6, -6:-5]   = 60
-    phantom[5:6, -6:-5, -6:-5]     = 70
-    phantom[-6:-5, -6:-5, -6:-5] = 80
+    for k in range(size_z):
+        phantom[k,:,:] = phantom2D*abs(size_z - (size_z//2 - k))    
+    #phantom[5:6, 5:6, 5:6]       = 10
+    #phantom[-6:-5, 5:6, 5:6]   = 20
+    #phantom[5:6, -6:-5, 5:6]     = 30
+    #phantom[-6:-5, -6:-5, 5:6] = 40
+    #phantom[5:6, 5:6, -6:-5]       = 50
+    #phantom[-6:-5, 5:6, -6:-5]   = 60
+    #phantom[5:6, -6:-5, -6:-5]     = 70
+    #phantom[-6:-5, -6:-5, -6:-5] = 80
     #for k in range(size_z):
     #    for j in range(size_x):
     #        for i in range(size_y):
@@ -75,8 +76,7 @@ def main():
                 for i in range(size_x):
                     f.write(str(phantom[size_z - k - 1, j, size_x - i - 1]) + " ")
         f.write("\n")
-    #for k in range(size_z):
-    #    phantom[k,:,:] = phantom2D.T
+
     vol_geom = astra.create_vol_geom((size_y, size_x, size_z))
     proj_geom = astra.create_proj_geom('cone',  1.0, 1.0, detector_size_y, detector_size_x, angles, source_object, object_det);
     sinogram = fp(proj_geom, vol_geom, phantom)

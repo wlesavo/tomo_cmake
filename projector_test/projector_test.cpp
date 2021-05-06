@@ -107,8 +107,8 @@ std::string getPath(std::string type, std::string file_type, bool out = false,  
 }
 
 void test3D() {
-    double distance_obj = 500.0, distance_source = 7000.0;
-    float delta_limit = 2.0;
+    double distance_obj = 200.0, distance_source = 200.0;
+    float delta_limit = 2000000.0;
 
     int size_x, size_y, size_z;
     int detector_size_x, detector_size_y, angle_count;
