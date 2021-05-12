@@ -9,7 +9,6 @@ Projector::Projector(std::unique_ptr<float[]> inputImg, std::shared_ptr<Geometry
 	: imgSize_x(imgSize_x), imgSize_y(imgSize_y), imgSize_z(imgSize_z), inputImg(MyImg(std::move(inputImg), imgSize_x, imgSize_y, imgSize_z)), geometry(std::move(geometry)), sumAlgorithm(sumAlgorithm){};
 
 
-
 // common methods
 
 std::pair<Point, Point> Projector::getIntersectionPoints(const Line& line) const {
@@ -219,32 +218,6 @@ std::pair<Line, Line> Projector::sortLines(const Line& line1, const Line& line2)
 }
 
 
-float Projector::sumNeibs(double j_min, double j_max, double i, bool transpose, bool reverse_x, int slice) const {
-	// summation along a vertical axis taking into account transpose and reverse transformations
-	
-	float summ = 0;
-
-	if (j_min < 0)
-		j_min = -1;
-	if (transpose) {
-		if (j_max >= inputImg.size_x)
-		{
-			j_max = inputImg.size_x;
-		}
-	}
-	else {
-		if (j_max >= inputImg.size_y)
-		{
-			j_max = inputImg.size_y;
-		}
-	}
-	
-	for (int j = j_min; j < j_max; j++) {
-		summ += inputImg.get(i, j, transpose, reverse_x, slice);
-	}
-	
-	return summ;
-}
 
 double Projector::singlePixelArea(int pixel_i, int pixel_j, const Line& line) const {
 	// return the part of the pixel above the line
@@ -360,228 +333,7 @@ float Projector::manyPixelArea(int i_min, int i_max, int j, bool upper, const Li
 	return sum;	
 }
 
-
-
-// sum algos
-
-float Projector::sumLine(const Line& line, int slice) const {
-	// main method for summation along the line based on the distance that the beam
-	// travels inside the pixel
-
-
-	if (line.isVertical) {
-		int s = line.transpose ? imgSize_x : imgSize_y;
-		return sumNeibs(-1, s, line.b, line.transpose, line.reverse_x, slice);
-	}
-
-	std::pair<Point, Point> intersect = getIntersectionPoints(line);
-
-	if (intersect.first.x == -999)
-		return 0.0f;
-
-	float sum = 0.0f;
-	// choose axis to sum along based on line parameters
-	// axis = 1; dy = 0, dx = 1 || axis = 0; dy = 1, dx = 0
-	
-	int i, j, i_max, j_max;
-	i = intersect.first.x;
-	j = intersect.first.y;
-	i_max = intersect.second.x;
-	j_max = intersect.second.y;
-
-	// main summation cycle
-	// summation is performed by sequencually finding next intersections of line and 
-	// vertical (axis = 0) or horizontal (axis = 1) pixel border, 
-	// summing up to this point and adding proportional values for the intersection area
-	double new_x, new_y, frac;
-	int new_i, new_j;
-	assert(line.k >= 1.0);
-	float temp_sum;
-	while (true) {
-		new_i = i + 1;
-		new_y = line.value(new_i);
-		new_j = std::floor(new_y);
-		sum += sumNeibs(j, new_j, i, line.transpose, line.reverse_x, slice);
-		frac = std::abs(new_y - new_j);
-		temp_sum = inputImg.get(i, new_j, line.transpose, line.reverse_x, slice) * frac + inputImg.get(new_i, new_j, line.transpose, line.reverse_x, slice) * (1 - frac);
-		sum += temp_sum;
-		i = new_i;
-		j = new_j + 1;
-		assert(sum >= 0);
-		if (j > j_max) {
-			return sum / std::abs(std::sin(line.angle));
-		}
-		
-	}
-}
-
-float Projector::sumBinary(const Line& line) const {
-
-	int s = line.transpose ? imgSize_x : imgSize_y;
-	if (line.isVertical) {
-		return sumNeibs(-1, s, line.b, line.transpose, line.reverse_x, 0);
-	}
-
-	std::pair<Point, Point> intersect = getIntersectionPoints(line);
-
-	if (intersect.first.x == -999)
-		return 0.0f;
-
-	float sum = 0.0f;
-	// choose axis to sum along based on line parameters
-	// axis = 1; dy = 0, dx = 1 || axis = 0; dy = 1, dx = 0
-
-	int i, j, i_max, j_max;
-	i = intersect.first.x;
-	j = intersect.first.y;
-	i_max = intersect.second.x;
-	j_max = intersect.second.y;
-	// main summation cycle
-	// summation is performed by sequencually finding next intersections of line and 
-	// vertical (axis = 0) or horizontal (axis = 1) pixel border, 
-	// summing up to this point and adding proportional values for the intersection area
-	double new_x, new_y, frac;
-	int new_i, new_j;
-	assert(line.k >= 1.0);
-	float temp_sum;
-	int count = 0;
-	while (true) {
-		new_i = i + 1;
-		new_y = line.value(new_i);
-		new_j = std::floor(new_y);
-		sum += sumNeibs(j, new_j, i, line.transpose, line.reverse_x, 0);
-		
-		temp_sum = (inputImg.get(i, new_j, line.transpose, line.reverse_x, 0) + inputImg.get(new_i, new_j, line.transpose, line.reverse_x, 0))/2;
-		
-		sum += temp_sum;
-		i = new_i;
-		j = new_j + 1;
-		assert(sum >= 0);
-		if (j > j_max) {
-			return sum / std::abs(std::sin(line.angle));
-		}
-	}
-	
-	
-}
-
-float Projector::sumLinear(const Line& line) const {
-	// not finished method for summation with counting pixel contributions
-	// based on distance to neighbour pixels
-	// DO NOT USE AS IS
-
-	// todo
-	if (line.isHorizontal)
-		return 0.0f; //sumNeibs(-1, imgSize_x, line.b, 0);
-	else if (line.isVertical)
-		return 0.0f; //sumNeibs(-1, imgSize_y, line.b, 1);
-
-	std::pair<Point, Point> intersect = getIntersectionPoints(line);
-
-	if (intersect.first.x == -999)
-		return 0.0f;
-
-	float sum = 0.0f;
-	// choose axis to sum along based on line parameters
-	// axis = 1; dy = 0, dx = 1 || axis = 0; dy = 1, dx = 0
-	int axis = (std::abs(line.k) >= 1.0);
-	int sign = (line.k > 0) - (line.k < 0);
-	int i, j, i_max, j_max;
-	i = intersect.first.x;
-	j = intersect.first.y;
-	i_max = intersect.second.x;
-	j_max = intersect.second.y;
-
-	// main summation cycle
-	// summation is performed by sequencually finding next intersections of line and 
-	// vertical (axis = 0) or horizontal (axis = 1) pixel border, 
-	// summing up to this point and adding proportional values for the intersection area
-	double new_x, new_y, frac;
-	int new_i, new_j;
-	double left, right;
-	while (true) {
-		if (axis == 1) { // dy == 0
-			new_x = line.coor(j + 0.5);
-			left = std::floor(new_x - 0.5);
-			right = left + 1;
-			frac = std::abs(new_x - 0.5 - left);
-			sum += inputImg.get(left, j) * (1 - frac) + inputImg.get(right, j) * frac;
-			j = j + 1;
-			assert(sum >= 0);
-			if (j > j_max + 1)
-				return sum / std::abs(std::sin(line.angle));
-		}
-		else if (axis == 0) { // dx == 0
-			new_y = line.value(i + 0.5);
-			left = std::floor(new_y - 0.5);
-			right = left + 1;
-			frac = std::abs(new_y - 0.5 - left);
-			sum += inputImg.get(i, left) * (1 - frac) + inputImg.get(i, right) * frac;
-			i = i + 1;
-			assert(sum >= 0);
-			if (i > i_max + 1)
-				return sum / std::abs(std::cos(line.angle));
-		}
-	}
-}
-
-float Projector::sumArea(const Line& line_1, const Line& line_2) const {
-	// Summation algorithm for the area between two parallel lines.
-	// Both lines always have k>1 or both vertical.
-
-	float sum = 0.0f;
-	float sum1, sum2, sum3;
-	double x_left_1, x_right_1;
-	double x_left_2, x_right_2;
-
-	assert(!line_1.isHorizontal);
-	if (line_1.isVertical && line_2.isVertical)
-	{
-		int s = line_1.transpose ? imgSize_x : imgSize_y;
-		sum1 = sumNeibs(-1, s, std::floor(line_1.b), line_1.transpose, line_1.reverse_x);
-		sum2 = sumNeibs(-1, s, std::floor(line_2.b), line_1.transpose, line_1.reverse_x);
-		if (line_1.b > line_2.b) {
-			return sum1 * (line_1.b - std::floor(line_1.b)) + sum2 * (1 - (line_2.b - std::floor(line_2.b)));
-		}
-		else {
-			return sum1 * (1 - (line_1.b - std::floor(line_1.b))) + sum2 * (line_2.b - std::floor(line_2.b));
-		}
-	}
-
-	std::pair<Point, Point> p_1, p_2;
-	p_1 = getIntersectionPoints(line_1);
-	p_2 = getIntersectionPoints(line_2);
-	
-	bool sign_1 = line_1.k > 0, sign_2 = line_2.k > 0;
-
-	int j, j_max;
-	j = std::min({ p_1.first.y, p_1.second.y, p_2.first.y, p_2.second.y });
-	j_max = std::max({ p_1.first.y, p_1.second.y, p_2.first.y, p_2.second.y });
-
-	if (p_2.first.x == -999) {
-		j = std::min(p_1.first.y, p_1.second.y);
-	}
-	assert(j_max >= j);
-	double left, right;
-	while (true) {
-		x_left_1 = line_1.coor(j);
-		x_right_1 = line_1.coor(j + 1);
-		x_left_2 = line_2.coor(j);
-		x_right_2 = line_2.coor(j + 1);
-
-		left = std::min({ x_left_1, x_right_1, x_left_2, x_right_2 });
-		right = std::max({ x_left_1, x_right_1, x_left_2, x_right_2 });
-
-		sum2 = manyPixelArea(std::floor(left), std::floor(right) + 1, j, sign_1, line_1);
-		sum3 = manyPixelArea(std::floor(left), std::floor(right) + 1, j, sign_2, line_2);
-		sum += std::abs(sum2 - sum3);
-		
-		j += 1;
-		if (j > j_max)
-			return sum;
-	}
-}
-
+// legacy
 float Projector::sumAreaExact(const Line& line_1, const Line& line_2) const {
 	// Summation algorithm for the area between two arbitrary lines.
 	// One of the line always have k>1 the other can be vertical or with k<-1.
@@ -595,8 +347,8 @@ float Projector::sumAreaExact(const Line& line_1, const Line& line_2) const {
 	if (line_1.isVertical && line_2.isVertical)
 	{
 		int s = line_1.transpose ? imgSize_x : imgSize_y;
-		sum1 = sumNeibs(-1, s, std::floor(line_1.b), line_1.transpose, line_1.reverse_x);
-		sum2 = sumNeibs(-1, s, std::floor(line_2.b), line_1.transpose, line_1.reverse_x);
+		sum1 = 0;// sumNeibs(-1, s, std::floor(line_1.b), line_1.transpose, line_1.reverse_x);
+		sum2 = 0;// sumNeibs(-1, s, std::floor(line_2.b), line_1.transpose, line_1.reverse_x);
 		if (line_1.b > line_2.b) {
 			return sum1 * (line_1.b - std::floor(line_1.b)) + sum2 * (1 - (line_2.b - std::floor(line_2.b)));
 		}
@@ -665,38 +417,6 @@ float Projector::sumAreaExact(const Line& line_1, const Line& line_2) const {
 	}
 
 }
-
-float Projector::sumLine3D(const Line& line) const {
-
-	double lambda, lambda_min = 0, lambda_max = std::min({ line.getLambda(inputImg.size_x, 0), line.getLambda(inputImg.size_y, 1), line.getLambda(inputImg.size_z, 2) });
-	lambda = lambda_min;
-
-	Point p = line.getPoint(lambda);
-	std::vector<double> lambdas(3);
-	int coor[3] = {};
-	coor[0] = std::floor(p.x), coor[1] = std::floor(p.y), coor[2] = std::floor(p.z);
-
-	for (int i = 0; i < 3; ++i) {
-		lambdas[i] = line.getLambda(coor[i] + 1.0, i);
-	}
-	int index = std::min_element(lambdas.begin(), lambdas.end()) - lambdas.begin();
-	float sum = 0.0f;
-	while (true) {
-		float b = (lambdas[index] - lambda) * inputImg.get(coor[0], coor[1], coor[2], line.reverse_x, line.reverse_y, line.reverse_z);
-		sum += b;
-		lambda = lambdas[index];
-		coor[index] += 1;
-		lambdas[index] = line.getLambda(coor[index] + 1.0, index);
-		index = std::min_element(lambdas.begin(), lambdas.end()) - lambdas.begin();
-		assert(lambdas[index] >= lambda);
-		
-		if (lambda > lambda_max) {
-			return sum;
-		} 		
-	}
-	return sum;
-}
-
 
 // weight algos
 
@@ -926,94 +646,13 @@ void Projector::getWeightsLine3D(const Line& line, int* coorDst, float* weightsD
 
 // main methods
 
-std::unique_ptr<float[]> Projector::getSingleForwardProjection(int angleIndex) const {
-	// summation along particular angle of projection for every pixel of detector
-
-	std::unique_ptr<float[]> outLineImg(new float[geometry->nDetectors]);
-	Line line, line1, line2;
-	std::pair<Line, Line> line_pair;
-	int detector_i, detector_j;
-	int slice;
-	for (int detectorIndex = 0; detectorIndex < geometry->nDetectors; ++detectorIndex) {
-		float out = 0;
-		
-		switch (sumAlgorithm)
-		{
-		case SumAlgorithm::LINE:
-			line = constructLine(geometry->getLine(angleIndex, detectorIndex));
-			out = sumLine(line);
-			break; 
-		case SumAlgorithm::LINE3DPARALLEL:
-			detector_i = detectorIndex % geometry->nDetectorsX;
-			detector_j = detectorIndex / geometry->nDetectorsX;
-			slice = std::floor((detector_j + 0.5)  - geometry->nDetectorsY + geometry->imgCenterZ);
-			line = constructLine(geometry->getLine(angleIndex, detector_i));
-			out = sumLine(line, slice);
-			break;
-		case SumAlgorithm::LINE3DFAN:
-			line = constructLine3D(geometry->getLine(angleIndex, detectorIndex));
-			out = sumLine3D(line);
-			break;
-		case SumAlgorithm::LINEAR:
-			line = constructLine(geometry->getLine(angleIndex, detectorIndex));
-			out = sumLinear(line);
-			break;
-		case SumAlgorithm::BINARY:
-			line = constructLine(geometry->getLine(angleIndex, detectorIndex));
-			out = sumBinary(line);
-			break;
-		case SumAlgorithm::AREA:
-			line_pair = geometry->getLinePair(angleIndex, detectorIndex);
-			line1 = constructLine(line_pair.first);
-			line2 = constructLine(line_pair.second, line1.transpose, line1.reverse_x);
-			out = sumArea(line1, line2);
-			break;
-		case SumAlgorithm::AREA_EXACT:
-			line_pair = geometry->getLinePair(angleIndex, detectorIndex, false);
-			if ((line_pair.first.isHorizontal ^ line_pair.second.isHorizontal) || (line_pair.first.isVertical ^ line_pair.second.isVertical)) {
-				std::pair<Line, Line> sorted_lines = sortLines(line_pair.first, line_pair.second);
-				line1 = sorted_lines.first;
-				line2 = sorted_lines.second;
-			}
-			else {
-				line1 = constructLine(line_pair.first);
-				line2 = constructLine(line_pair.second, line1.transpose, line1.reverse_x);
-			}
-			out = sumAreaExact(line1, line2);
-			break;
-
-		default:
-			break;
-		}
-
-		outLineImg[detectorIndex] = out;
-	}
-
-	return outLineImg;
-}
-
-void Projector::buildForwardProjectionOld(){
-	// build projection for every angle
-	// x axis is angle to detector as an index in input 'angles' vector
-	// y axis is a detector pixel
-
-	std::unique_ptr<float[]> outfloatImg(new float[geometry->nDetectors * geometry->angles.size()]);
-	for (int angleIndex = 0; angleIndex < geometry->angles.size(); ++angleIndex) {
-		std::unique_ptr<float[]> lineImg = getSingleForwardProjection(angleIndex);
-		for (int j = 0; j < geometry->nDetectors; ++j) {
-			outfloatImg[angleIndex * geometry->nDetectors + j ] = lineImg[j];
-		}
-	}
-	forwardProjection = std::move(outfloatImg);
-}
-
 std::unique_ptr<unsigned char[]> Projector::getForwardProjectionImage() {
 	// normalize and return full projection in an image format
 	// x axis is angle to detector as an index in input 'angles' vector
 	// y axis is a detector pixel
 
 	if (forwardProjection == nullptr)
-		buildForwardProjectionOld();
+		buildForwardProjection();
 
 	std::unique_ptr<unsigned char[]> outCharImg(new unsigned char[geometry->nDetectors * geometry->angles.size()]);
 	float max_val = *std::max_element(&forwardProjection[0], &forwardProjection[geometry->nDetectors * geometry->angles.size() - 1]);
@@ -1031,13 +670,11 @@ std::unique_ptr<float[]> Projector::getForwardProjection() {
 	// getter for python interface
 
 	if (!forwardProjection) {
-		buildForwardProjectionOld();
+		buildForwardProjection();
 	}
 	return std::move(forwardProjection);
 }
 
-// getWeightsLine3D(line, coorDst, weightsDst, sizeDst);
-// getWeightsArea(line1, line2, coorDst, weightsDst, sizeDst);
 // getWeightsAreaExact(line1, line2, coorDst, weightsDst, sizeDst);
 // main methods weights
 
@@ -1161,64 +798,4 @@ void Projector::getWeights(int angleIndex, int detectorIndex, int* coorDst, floa
 	default:
 		break;
 	}
-}
-
-// debug methods
-
-float Projector::getLineProjectionTest(int i_angle, int detector) {
-	// test function for checking particular angle and detector
-
-	float out = 0.0f;
-	Line line, line1, line2;
-	std::pair<Line, Line> line_pair;
-	int slice, detector_i, detector_j;
-	switch (sumAlgorithm)
-	{
-	case SumAlgorithm::LINE:
-		line = constructLine(geometry->getLine(i_angle, detector));
-		out = sumLine(line);
-		break;
-	case SumAlgorithm::LINE3DPARALLEL:
-		detector_i = detector % geometry->nDetectorsX;
-		detector_j = detector / geometry->nDetectorsX;
-		slice = std::floor((geometry->nDetectorsY - (detector_j + 0.5)) + geometry->imgCenterZ);
-		line = constructLine(geometry->getLine(i_angle, detector_i));
-		out = sumLine(line, slice);
-		break;
-	case SumAlgorithm::LINE3DFAN:
-		line = constructLine3D(geometry->getLine(i_angle, detector));
-		out = sumLine3D(line);
-		break;
-
-	case SumAlgorithm::LINEAR:
-		line = constructLine(geometry->getLine(i_angle, detector));
-		out = sumLinear(line);
-		break;
-	case SumAlgorithm::BINARY:
-		line = constructLine(geometry->getLine(i_angle, detector));
-		out = sumBinary(line);
-		break;
-	case SumAlgorithm::AREA:
-		line_pair = geometry->getLinePair(i_angle, detector);
-		line1 = constructLine(line_pair.first);
-		line2 = constructLine(line_pair.second, line1.transpose, line1.reverse_x);
-		out = sumArea(line1, line2);
-		break;
-	case SumAlgorithm::AREA_EXACT:
-		line_pair = geometry->getLinePair(i_angle, detector, false);
-		if ((line_pair.first.isHorizontal ^ line_pair.second.isHorizontal) || (line_pair.first.isVertical ^ line_pair.second.isVertical)) {
-			std::pair<Line, Line> sorted_lines = sortLines(line_pair.first, line_pair.second);
-			line1 = sorted_lines.first;
-			line2 = sorted_lines.second;
-		}
-		else {
-			line1 = constructLine(line_pair.first);
-			line2 = constructLine(line_pair.second, line1.transpose, line1.reverse_x);
-		}
-		out = sumAreaExact(line1, line2);
-		break;
-	default:
-		break;
-	}
-	return out;
 }
