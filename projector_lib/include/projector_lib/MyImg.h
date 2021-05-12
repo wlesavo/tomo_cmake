@@ -12,7 +12,9 @@ public:
 
 
 	float get(int i, int j, bool transpose = false, bool reverse_x = false, bool reverse_y = false, int slice = 0) const;
+	int get_coor(int i, int j, bool transpose = false, bool reverse_x = false, bool reverse_y = false, int slice = 0) const;
 	float get(int i, int j, int k, bool reverse_x = false, bool reverse_y = false, bool reverse_z = false) const;
+
 };
 
 #endif

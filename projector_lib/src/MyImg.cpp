@@ -23,11 +23,30 @@ float MyImg::get(int i, int j, bool transpose, bool reverse_x, bool reverse_y, i
 	int coor;
 
 	coor = i + j * size_x + slice * size_x * size_y;
-	if (coor > size_x * size_y) {
-		return 0;
-	}
+
 	return inputImg[coor];
 };
+
+
+int MyImg::get_coor(int i, int j, bool transpose, bool reverse_x, bool reverse_y, int slice) const {
+	if (transpose) {
+		int a = j;
+		j = i;
+		i = a;
+	}
+
+	if (i < 0 || i >= size_x || j < 0 || j >= size_y || slice < 0 || slice >= size_z) {
+		return -1;
+	}
+	if (reverse_x)
+		i = size_x - 1 - i;
+	if (reverse_y)
+		j = size_y - 1 - j;
+
+	int coor = i + j * size_x + slice * size_x * size_y;
+	
+	return coor;
+}
 
 float MyImg::get(int i, int j, int k, bool reverse_x, bool reverse_y, bool reverse_z) const {
 	if (i < 0 || i >= size_x || j < 0 || j >= size_y || k < 0 || k >= size_z) {

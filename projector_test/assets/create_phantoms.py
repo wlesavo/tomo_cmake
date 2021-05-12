@@ -44,7 +44,7 @@ def create_phantom(dim, model, size_x, size_y, size_z):
     im.save(phantom_bmp_path)
     
 def main():
-    size_x, size_y, size_z = (512, 512, 100);
+    size_x, size_y, size_z = (256, 256, 1);
     create_phantom("2D", "phantom", size_x, size_y, 1)
     size_x, size_y, size_z = (128, 128, 128);
     create_phantom("3D", "phantom", size_x, size_y, size_z)

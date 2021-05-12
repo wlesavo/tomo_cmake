@@ -43,13 +43,13 @@ PROJECTOR_API void projector_free(struct Projector* projector) {
 // projector methods
 
 PROJECTOR_API void projector_get_full_projection(float** out, size_t* out_size_x, size_t* out_size_y, struct Projector* projector) {
-	*out = projector->getFullProjection().release();
+	*out = projector->getForwardProjection().release();
 	*out_size_x = static_cast<size_t>(projector->geometry->nDetectors);
 	*out_size_y = static_cast<size_t>(projector->geometry->angles.size());
 }
 
 PROJECTOR_API void projector_get_single_projection(float** out, size_t* out_size, struct Projector* projector, int angle) {
-	*out = projector->getSingleProjection(angle).release();
+	*out = projector->getSingleForwardProjection(angle).release();
 	*out_size = static_cast<size_t>(projector->geometry->nDetectors);
 }
 

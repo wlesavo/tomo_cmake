@@ -18,7 +18,8 @@ public:
 
 	const int imgSize_x, imgSize_y, imgSize_z;
 	std::shared_ptr<Geometry> geometry;
-	std::unique_ptr<float[]> fullProjection = nullptr;
+	std::unique_ptr<float[]> forwardProjection = nullptr;
+	std::unique_ptr<float[]> backProjection = nullptr;
 
 	// debug vars
 	bool testFlag = false;
@@ -28,10 +29,13 @@ public:
 	Projector(std::unique_ptr<float[]> inputImg, std::shared_ptr<Geometry> geometry, SumAlgorithm sumAlgorithm, int imgSize_x, int imgSize_y, int imgSize_z = 1);
 	
 	// main methods
-	std::unique_ptr<float[]> getSingleProjection(int angle_i) const;
-	void buildFullProjection();
-	std::unique_ptr<float[]> getFullProjection();
-	std::unique_ptr<unsigned char[]> getFullProjectionImage();
+	std::unique_ptr<float[]> getSingleForwardProjection(int angle_i) const;
+	void buildForwardProjection();
+	std::unique_ptr<float[]> getForwardProjection();
+	std::unique_ptr<unsigned char[]> getForwardProjectionImage();
+	void buildBackProjection(); 
+	void getWeights(int angleIndex, int detectorIndex, int* coorDst, float* weightsDst, int* sizeDst);
+	void projectBack(float value, int* coors, float* weights, int size);
 
 	// common methods
 	std::pair<Point, Point> getIntersectionPoints(const Line& line) const;
@@ -50,6 +54,15 @@ public:
 	float sumLinear(const Line& line) const;
 	float sumArea(const Line& line1, const Line& line2) const;
 	float sumAreaExact(const Line& line_1, const Line& line_2) const;
+	float sumBinary(const Line& line) const;
+
+	// weight algorithms
+	void weightNeibs(double j_min, double j_max, double i, int* coorDst, float* weightsDst, int* sizeDst, bool transpose, bool reverse_x, int slice = 0) const;
+	void getWeightsLine(const Line& line, int* coorDst, float* weightsDst, int* size, int slice=0) const;
+	float sumByWeights(int* coorDst, float* weightsDst, int* sizeDst) const;
+	float distributeByWeights(float value, int* coorDst, float* weightsDst, int* sizeDst) const;
+	float sumLineByWeights(const Line& line, int slice = 0) const;
+
 	
 	// debug methods
 	float getLineProjectionTest(int angle, int detector);

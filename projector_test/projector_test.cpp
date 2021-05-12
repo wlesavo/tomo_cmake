@@ -43,8 +43,15 @@ std::string getPath(std::string type, std::string dim, std::string file_type, bo
         }        
         if (geometry.size() > 0)
             out_string += "_" + geometry;
-        if (algo.size() > 0)
-            out_string += "_" + algo;
+        if (algo.size() > 0) {
+            if (algo == "binary") {
+                out_string += "_line";
+            }
+            else {
+                out_string += "_" + algo;
+            }
+        }
+
         out_string += "." + file_type;
     }
     return out_string;
@@ -246,7 +253,7 @@ void test3D(std::string model) {
     std::shared_ptr<Geometry> input_geometry = nullptr;
     input_geometry = std::move(std::make_shared<GeometryFanBeam3D>(GeometryFanBeam3D(angles, detector_size_x, detector_size_y, 1.0, distance_source, distance_obj, size_x * 0.5, size_y * 0.5, size_z * 0.5)));
     Projector proj(std::move(img), input_geometry, SumAlgorithm::LINE3DFAN, size_x, size_y, size_z);
-    proj.buildFullProjection();
+    proj.buildForwardProjection();
 
     // count sigma and max delta
     float delta = 0.0f;
@@ -256,13 +263,13 @@ void test3D(std::string model) {
     int detector_count = detector_size_x * detector_size_y;
     for (int i = 0; i < angle_count; ++i) {
         for (int j = 0; j < detector_count; ++j) {
-            delta = target[i * detector_count + j] - proj.fullProjection[i * detector_count + j];
-            if (proj.fullProjection[i * detector_count + j] > max_val) {
-                max_val = proj.fullProjection[i * detector_count + j];
+            delta = target[i * detector_count + j] - proj.forwardProjection[i * detector_count + j];
+            if (proj.forwardProjection[i * detector_count + j] > max_val) {
+                max_val = proj.forwardProjection[i * detector_count + j];
             }
             if (std::abs(delta) > max_delta) {
                 max_delta = std::abs(delta);
-                out_delta = std::abs(delta) / proj.fullProjection[i * detector_count + j];
+                out_delta = std::abs(delta) / proj.forwardProjection[i * detector_count + j];
             }
 
             float delta_sq = delta * delta;
@@ -272,7 +279,7 @@ void test3D(std::string model) {
                         
             if (std::abs(delta) > delta_limit) {
                 std::cerr << "delta: " << delta << " target: " << target[i * detector_count + j] << " res: "
-                    << proj.fullProjection[i * detector_count + j] << " det: " << j << " ang: " << i << std::endl;
+                    << proj.forwardProjection[i * detector_count + j] << " det: " << j << " ang: " << i << std::endl;
 
                 proj.getLineProjectionTest(i, j);
             }
@@ -292,14 +299,14 @@ void test3D(std::string model) {
             int j_x = j % detector_size_x;
             int j_y = j / detector_size_x;
 
-            float d = (target[i * detector_count + j] - proj.fullProjection[i * detector_count + j]);
+            float d = (target[i * detector_count + j] - proj.forwardProjection[i * detector_count + j]);
             float value = d / max_delta;
             int k = value > 0 ? 0 : 1;
             color3[0] = 0;
             color3[1] = 0;
             color3[k] = abs(value * 255);
             diff_float.draw_point(j_x, j_y + i * detector_size_y, color3);
-            color[0] = proj.fullProjection[i * detector_count + j]/max_val * 255;
+            color[0] = proj.forwardProjection[i * detector_count + j]/max_val * 255;
             image.draw_point(j_x, j_y + i * detector_size_y, color);
         }
     }
@@ -312,16 +319,17 @@ void test3D(std::string model) {
 
 void fullTest2D() {
 
-    double delta_limit = 2000000;
+    double delta_limit = 1000000;
     double delta_limit_2 = 2000000;
-    double distance_obj = 500.0, distance_source = 7000.0;
+    double distance_obj = 1000.0, distance_source = 7000.0;
 
-    std::string model = "model"; // "phantom", "model";
-    std::string algo_string = "area";    // "area", "line";
-    std::string geometry_string = "fan";     // "fan", "par";
+    std::string model = "phantom"; // "phantom", "model";
+    std::string algo_string = "line";    // "area", "line", "binary";
+    std::string geometry_string = "par";     // "fan", "par";
     int size_z = 1;
     int detector_size_y = 100;
     bool exact = true;
+    bool by_weights = true;
 
     //std::string p = "..\\..\\..\\phantom" + model + geometry_string + algo_string + ".bmp";// ??
     std::string p = getPath("phantom", "2D", "bmp", false, model);
@@ -329,6 +337,7 @@ void fullTest2D() {
     std::string target_txt_path = getPath("sinogram", "2D", "txt", false, model, algo_string, geometry_string);
 
     std::string out_sino = getPath("out_sinogram", "", "bmp", true);
+    std::string out_sino_target = getPath("out_sinogram_target", "", "bmp", true);
     std::string out_diff_float = getPath("out_residual_float", "", "bmp", true);
     std::string out_diff = getPath("out_residual", "", "bmp", true);
     std::string out_delta_txt_path = getPath("delta", "", "txt", true);
@@ -336,6 +345,7 @@ void fullTest2D() {
 
     const char* const phantom_path = p.c_str();
     const char* const target_path = t.c_str();
+    const char* const out_sino_target_path = out_sino_target.c_str();
     const char* const out_sino_path = out_sino.c_str();
     const char* const out_diff_float_path = out_diff_float.c_str();
     const char* const out_diff_path = out_diff.c_str();
@@ -376,7 +386,15 @@ void fullTest2D() {
             sum_algo = SumAlgorithm::AREA;
     }
     else if (algo_string == "line") {
-        sum_algo = SumAlgorithm::LINE;
+        if (by_weights) {
+            sum_algo = SumAlgorithm::LINE_BY_WEIGHTS;
+        }
+        else {
+            sum_algo = SumAlgorithm::LINE;
+        }
+    }
+    else if (algo_string == "binary") {
+        sum_algo = SumAlgorithm::BINARY;
     }
     std::shared_ptr<Geometry> input_geometry = nullptr;
     if (geometry_string == "fan") {
@@ -388,7 +406,7 @@ void fullTest2D() {
 
     Projector myProj(std::move(img), std::move(input_geometry), sum_algo, size_x, size_y);
 
-    std::unique_ptr<unsigned char[]> fp = myProj.getFullProjectionImage();
+    std::unique_ptr<unsigned char[]> fp = myProj.getForwardProjectionImage();
 
     // compare the differences in image form,
     // count non-zero differences in pixels for statistics
@@ -437,13 +455,30 @@ void fullTest2D() {
     // read ground truth sinogram from file
 
     std::unique_ptr<float[]> target_f(new float[angle_count * detector_size]);
+    float max_f = 0;
     for (int i = 0; i < angle_count; ++i) {
         for (int j = 0; j < detector_size; ++j) {
             float a;
             input_f >> a;
             target_f[i * detector_size + j] = a;
+            if (a > max_f) {
+                max_f = a;
+            }
         }
     }
+
+    cimg_library::CImg<float> target_sino_img(angle_count, detector_size, 1, 1, 0);
+    float color_f[] = { 255.0f };
+    for (int i = 0; i < angle_count; ++i) {
+        for (int j = 0; j < detector_size; ++j) {
+            float a = target_f[i * detector_size + j];
+            color_f[0] = a / max_f;
+            target_sino_img.draw_point(i, j, color_f);
+
+        }
+    }
+    target_sino_img.normalize(0, 255);
+    target_sino_img.save(out_sino_target_path);
     input_f.close();
 
     // calculate sigma from ground truth
@@ -456,9 +491,9 @@ void fullTest2D() {
     output_f << "delta " << "target " << "res" << std::endl;
     for (int i = 0; i < angle_count; ++i) {
         for (int j = 0; j < detector_size; ++j) {
-            delta = target_f[i * detector_size + j] - myProj.fullProjection[i * detector_size + j];
-            if (target_f[i * detector_size + j] > 0.1 && myProj.fullProjection[i * detector_size + j] > 0.1) {
-                percentage_delta = delta / std::max(target_f[i * detector_size + j], myProj.fullProjection[i * detector_size + j]);
+            delta = target_f[i * detector_size + j] - myProj.forwardProjection[i * detector_size + j];
+            if (target_f[i * detector_size + j] > 0.1 && myProj.forwardProjection[i * detector_size + j] > 0.1) {
+                percentage_delta = delta / std::max(target_f[i * detector_size + j], myProj.forwardProjection[i * detector_size + j]);
                 if (std::abs(percentage_delta) > std::abs(max_percentage_delta)) {
                     max_percentage_delta = percentage_delta;
 
@@ -466,7 +501,7 @@ void fullTest2D() {
             }
             if (std::abs(delta) > max_delta) {
                 max_delta = std::abs(delta);
-                out_delta = std::abs(delta) / myProj.fullProjection[i * detector_size + j];
+                out_delta = std::abs(delta) / myProj.forwardProjection[i * detector_size + j];
             }
             float delta_sq = delta * delta;
             total_delta += delta_sq;
@@ -478,18 +513,18 @@ void fullTest2D() {
                 neg_delta += 1;
             if (std::abs(delta) > delta_limit_2 && i < angle_count / 2) {
                 float delta1 = target_f[i * detector_size + j] - target_f[(180 + i) * detector_size + j];
-                float delta2 = myProj.fullProjection[i * detector_size + j] - myProj.fullProjection[(180 + i) * detector_size + j];
+                float delta2 = myProj.forwardProjection[i * detector_size + j] - myProj.forwardProjection[(180 + i) * detector_size + j];
                 std::cout << "delta: " << delta << " target: " << delta1 << " res: " << delta2 << std::endl;
             }
             if (std::abs(delta) > 0) {
                 Line line = myProj.geometry->getLine(myProj.geometry->angles[i], j);
 
                 output_f << delta << " " << target_f[i * detector_size + j] << " "
-                    << myProj.fullProjection[i * detector_size + j] << std::endl;
+                    << myProj.forwardProjection[i * detector_size + j] << std::endl;
             }
             if (std::abs(delta) > delta_limit) {
                 std::cerr << "delta: " << delta << " delta_p: " << percentage_delta << " target: " << target_f[i * detector_size + j] << " res: "
-                    << myProj.fullProjection[i * detector_size + j] << " det: " << j << " ang: " << i << std::endl;
+                    << myProj.forwardProjection[i * detector_size + j] << " det: " << j << " ang: " << i << std::endl;
 
                 myProj.getLineProjectionTest(i, j);
             }
@@ -509,8 +544,8 @@ void fullTest2D() {
             Line line;
             float t_direct = target_f[i * detector_size + j];
             float t_sym = target_f[(180 + i) * detector_size + detector_size - j - 1];
-            float r_direct = myProj.fullProjection[i * detector_size + j];
-            float r_sym = myProj.fullProjection[(i + 180) * detector_size + detector_size - j - 1];
+            float r_direct = myProj.forwardProjection[i * detector_size + j];
+            float r_sym = myProj.forwardProjection[(i + 180) * detector_size + detector_size - j - 1];
             delta = std::max(std::abs(t_direct - r_direct), std::abs(t_sym - r_sym));
             t_delta_sym = std::abs(t_direct - t_sym);
             r_delta_sym = std::abs(r_direct - r_sym);
@@ -544,14 +579,14 @@ void fullTest2D() {
     float max_p = 0.1f;
     for (int i = 0; i < angle_count; ++i) {
         for (int j = 0; j < detector_size; ++j) {
-            float d = (target_f[i * detector_size + j] - myProj.fullProjection[i * detector_size + j]);
+            float d = (target_f[i * detector_size + j] - myProj.forwardProjection[i * detector_size + j]);
             float value = d / max_delta;
             int k = value > 0 ? 0 : 1;
             color3[0] = 0;
             color3[1] = 0;
             color3[k] = abs(value * 255);
             diff_float.draw_point(i, j, color3);
-            percentage_delta = d / std::max(target_f[i * detector_size + j], myProj.fullProjection[i * detector_size + j]);
+            percentage_delta = d / std::max(target_f[i * detector_size + j], myProj.forwardProjection[i * detector_size + j]);
             percentage_delta = std::min(std::abs(percentage_delta), max_p);
             color3[k] = abs(percentage_delta / max_p * 255);
             diff_percentage.draw_point(i, j, color3);
@@ -615,8 +650,8 @@ void test3D_self_projection(){
     const char* const out_sino_path = out_sino.c_str();
     const char* const out_sino_2D_path = out_sino_2D.c_str();
 
-    proj2D->buildFullProjection();
-    proj3D->buildFullProjection();
+    proj2D->buildForwardProjection();
+    proj3D->buildForwardProjection();
 
     float max_val = 0.0f;
     float total_max_delta = 0.0f;
@@ -632,8 +667,8 @@ void test3D_self_projection(){
         
         for (int i = 0; i < angle_count; ++i) {
             for (int j = 0; j < detector_count_x; ++j) {
-                float target = proj2D->fullProjection[j + i * detector_count_x];
-                float res = (proj3D->fullProjection[j + k * detector_count_x + i * detector_count_x * detector_count_y]) * koeff;
+                float target = proj2D->forwardProjection[j + i * detector_count_x];
+                float res = (proj3D->forwardProjection[j + k * detector_count_x + i * detector_count_x * detector_count_y]) * koeff;
                 delta = target - res;
                 
                 if (std::abs(delta) > max_delta) {
@@ -672,8 +707,8 @@ void test3D_self_projection(){
         }
         for (int i = 0; i < angle_count; ++i) {
             for (int j = 0; j < detector_count_x; ++j) {
-                float target = proj2D->fullProjection[j + i * detector_count_x];
-                float res    = proj3D->fullProjection[j + k * detector_count_x + i * detector_count_x * detector_count_y] * koeff;
+                float target = proj2D->forwardProjection[j + i * detector_count_x];
+                float res    = proj3D->forwardProjection[j + k * detector_count_x + i * detector_count_x * detector_count_y] * koeff;
                 int g = res > target ? 0 : 1;
                 color[0] = 0;
                 color[1] = 0;
@@ -703,7 +738,7 @@ void measure(std::string model, std::string algo_string, std::string geometry_st
     }
     std::unique_ptr<Projector> proj = getProjector(dim, angle_count, detector_count_x, detector_count_y, model, algo_string, geometry_string);
     auto start = std::chrono::high_resolution_clock::now();
-    proj->buildFullProjection();
+    proj->buildForwardProjection();
     auto end = std::chrono::high_resolution_clock::now();
     auto time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     std::cerr << dim << " " << geometry_string << " " << algo_string << std::endl;
@@ -716,16 +751,16 @@ void measure(std::string model, std::string algo_string, std::string geometry_st
 
 int main()
 {   
-    int detector_count_x = 128;
-    int detector_count_y = 128;
-    int angle_count = 180;
-    std::string model = "phantom";
-    std::string algo_string = "line";
-    std::string geometry_string = "fan";
-    std::string dim = "2D";
+    //int detector_count_x = 128;
+    //int detector_count_y = 128;
+    //int angle_count = 180;
+    //std::string model = "phantom";
+    //std::string algo_string = "line";
+    //std::string geometry_string = "fan";
+    //std::string dim = "2D";
 
-    measure(model, algo_string, geometry_string, dim, detector_count_x, detector_count_y, angle_count);
-    //fullTest2D();
+    //measure(model, algo_string, geometry_string, dim, detector_count_x, detector_count_y, angle_count);
+    fullTest2D();
     //test3D("model");
     //test3D_self_projection();
 }
