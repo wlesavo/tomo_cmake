@@ -699,7 +699,47 @@ float Projector::sumLine3D(const Line& line) const {
 
 
 // weight algos
-void Projector::weightNeibs(double j_min, double j_max, double i, int* coorDst, float* weightsDst, int* sizeDst, bool transpose, bool reverse_x, int slice) const {
+
+void Projector::weightNeibsArea(int i_min, int i_max, int j, const Line& line1, const Line& line2,
+	int* coorDst, float* weightsDst, int* sizeDst) const {
+
+	float sum = 0.0f;
+	int size_x = line1.transpose ? imgSize_y : imgSize_x;
+	int size_y = line1.transpose ? imgSize_x : imgSize_y;
+	bool upper1 = line1.k > 0;
+	bool upper2 = line2.k > 0;
+	if (j < 0 || j >= size_y) {
+		return;
+	}
+	if (i_min < 0)
+		i_min = 0;
+	if (i_max >= size_x)
+		i_max = size_x;
+	for (int i = i_min; i < i_max; i++) {
+		int coor = inputImg.get_coor(i, j, line1.transpose, line1.reverse_x);
+		if (coor < 0) {
+			continue;
+		}
+		double area1 = singlePixelArea(i, j, line1);
+		double area2 = singlePixelArea(i, j, line2);
+		if (!upper1) {
+			area1 = 1.0 - area1;
+		}
+		if (!upper2) {
+			area2 = 1.0 - area2;
+		}
+		if (area1 == area2)
+			continue;
+
+		coorDst[*sizeDst] = coor;
+		weightsDst[*sizeDst] = std::abs(area1-area2);
+		*sizeDst += 1;
+		
+	}
+	return;
+}
+
+void Projector::weightNeibsLine(double j_min, double j_max, double i, int* coorDst, float* weightsDst, int* sizeDst, bool transpose, bool reverse_x, int slice, float koeff) const {
 	
 	if (j_min < 0)
 		j_min = 0;
@@ -719,20 +759,20 @@ void Projector::weightNeibs(double j_min, double j_max, double i, int* coorDst, 
 		int coor = inputImg.get_coor(i, j, transpose, reverse_x, slice);
 		if (coor >= 0) {
 			coorDst[*sizeDst] = coor;
-			weightsDst[*sizeDst] = 1;
+			weightsDst[*sizeDst] = koeff;
 			*sizeDst += 1;
 		}
 	}
 
 }
 
-void Projector::getWeightsLine(const Line& line, int* coorDst, float* weightsDst, int* sizeDst, int slice)  const {
+void Projector::getWeightsLine(const Line& line, int* coorDst, float* weightsDst, int* sizeDst, int slice, bool isBinary)  const {
 	// main method for summation along the line based on the distance that the beam
 	// travels inside the pixel
 
 	if (line.isVertical) {
 		int s = line.transpose ? imgSize_x : imgSize_y;
-		weightNeibs(-1, s, line.b, coorDst, weightsDst, sizeDst, line.transpose, line.reverse_x, slice);
+		weightNeibsLine(-1, s, line.b, coorDst, weightsDst, sizeDst, line.transpose, line.reverse_x, slice);
 		return;
 	}
 
@@ -747,7 +787,7 @@ void Projector::getWeightsLine(const Line& line, int* coorDst, float* weightsDst
 	i_max = intersect.second.x;
 	j_max = intersect.second.y;
 
-	double new_x, new_y, frac;
+	double new_x, new_y, weight;
 	int new_i, new_j;
 	assert(line.k >= 1.0);
 	float temp_sum;
@@ -756,18 +796,23 @@ void Projector::getWeightsLine(const Line& line, int* coorDst, float* weightsDst
 		new_i = i + 1;
 		new_y = line.value(new_i);
 		new_j = std::floor(new_y);
-		weightNeibs(j, new_j, i, coorDst, weightsDst, sizeDst, line.transpose, line.reverse_x, slice);
-		frac = std::abs(new_y - new_j);
+		weightNeibsLine(j, new_j, i, coorDst, weightsDst, sizeDst, line.transpose, line.reverse_x, slice);
+		if (isBinary) {
+			weight = 0.5;
+		}
+		else {
+			weight = std::abs(new_y - new_j);
+		}
 		coor = inputImg.get_coor(i, new_j, line.transpose, line.reverse_x, slice);
 		if (coor >= 0) {
 			coorDst[*sizeDst] = coor;
-			weightsDst[*sizeDst] = frac;
+			weightsDst[*sizeDst] = weight;
 			*sizeDst += 1;
 		}
 		coor = inputImg.get_coor(new_i, new_j, line.transpose, line.reverse_x, slice);
 		if (coor >= 0) {
 			coorDst[*sizeDst] = coor;
-			weightsDst[*sizeDst] = (1.0f - frac);
+			weightsDst[*sizeDst] = (1.0f - weight);
 			*sizeDst += 1;
 		}
 
@@ -785,25 +830,98 @@ void Projector::getWeightsLine(const Line& line, int* coorDst, float* weightsDst
 	return;
 }
 
-float Projector::sumByWeights(int* coorDst, float* weightsDst, int* sizeDst) const {
-	float sum = 0;
-	for (int i = 0; i < *sizeDst; ++i) {
-		sum += weightsDst[i] * inputImg.inputImg[coorDst[i]];
+void Projector::getWeightsArea(const Line& line_1, const Line& line_2, int* coorDst, float* weightsDst, int* sizeDst) const {
+
+	float sum = 0.0f;
+	float sum1, sum2, sum3;
+	double x_left_1, x_right_1;
+	double x_left_2, x_right_2;
+
+	assert(!line_1.isHorizontal);
+	if (line_1.isVertical && line_2.isVertical)
+	{
+		int s = line_1.transpose ? imgSize_x : imgSize_y;
+		float koeff_1, koeff_2;
+		if (line_1.b > line_2.b) {
+			koeff_1 = (line_1.b - std::floor(line_1.b)); 
+			koeff_2 = (1 - (line_2.b - std::floor(line_2.b)));
+		}
+		else {
+			koeff_1 = (1 - (line_1.b - std::floor(line_1.b)));
+			koeff_2 = (line_2.b - std::floor(line_2.b));
+		}
+		weightNeibsLine(-1, s, std::floor(line_1.b), coorDst, weightsDst, sizeDst, line_1.transpose, line_1.reverse_x, 0, koeff_1);
+		weightNeibsLine(-1, s, std::floor(line_2.b), coorDst, weightsDst, sizeDst, line_1.transpose, line_1.reverse_x, 0, koeff_2);
+		return;		
 	}
-	return sum;
+
+	std::pair<Point, Point> p_1, p_2;
+	p_1 = getIntersectionPoints(line_1);
+	p_2 = getIntersectionPoints(line_2);
+
+	bool sign_1 = line_1.k > 0, sign_2 = line_2.k > 0;
+
+	int j, j_max;
+	j = std::min({ p_1.first.y, p_1.second.y, p_2.first.y, p_2.second.y });
+	j_max = std::max({ p_1.first.y, p_1.second.y, p_2.first.y, p_2.second.y });
+
+	if (p_2.first.x == -999) {
+		j = std::min(p_1.first.y, p_1.second.y);
+	}
+	assert(j_max >= j);
+	double left, right;
+	while (true) {
+		x_left_1 = line_1.coor(j);
+		x_right_1 = line_1.coor(j + 1);
+		x_left_2 = line_2.coor(j);
+		x_right_2 = line_2.coor(j + 1);
+
+		left = std::min({ x_left_1, x_right_1, x_left_2, x_right_2 });
+		right = std::max({ x_left_1, x_right_1, x_left_2, x_right_2 });
+
+		weightNeibsArea(std::floor(left), std::floor(right) + 1, j, line_1, line_2, coorDst, weightsDst, sizeDst);
+
+		j += 1;
+		if (j > j_max)
+			return;
+	}
 }
 
-float Projector::sumLineByWeights(const Line& line, int slice) const {
-	int sizeDst = 0;
-	int* coorDst = new int[imgSize_x + imgSize_y + 1]();
-	float* weightsDst = new float[imgSize_x + imgSize_y + 1]();
-	getWeightsLine(line, coorDst, weightsDst, &sizeDst);
-	float sum = sumByWeights(coorDst, weightsDst, &sizeDst);
-	delete[] coorDst;
-	delete[] weightsDst;
-	return sum;
-}
+void Projector::getWeightsLine3D(const Line& line, int* coorDst, float* weightsDst, int* sizeDst) const {
 
+	double lambda, lambda_min = 0, lambda_max = std::min({ line.getLambda(inputImg.size_x, 0), line.getLambda(inputImg.size_y, 1), line.getLambda(inputImg.size_z, 2) });
+	lambda = lambda_min;
+
+	Point p = line.getPoint(lambda);
+	std::vector<double> lambdas(3);
+	int coors[3] = {};
+	coors[0] = std::floor(p.x), coors[1] = std::floor(p.y), coors[2] = std::floor(p.z);
+
+	for (int i = 0; i < 3; ++i) {
+		lambdas[i] = line.getLambda(coors[i] + 1.0, i);
+	}
+	int index = std::min_element(lambdas.begin(), lambdas.end()) - lambdas.begin();
+
+	while (true) {
+		float weight = (lambdas[index] - lambda);
+		int target_coor = inputImg.get_coor(coors[0], coors[1], coors[2], line.reverse_x, line.reverse_y, line.reverse_z);
+		if (target_coor >= 0) {
+			coorDst[*sizeDst] = target_coor;
+			weightsDst[*sizeDst] = weight;
+			*sizeDst += 1;
+		}
+		
+		lambda = lambdas[index];
+		coors[index] += 1;
+		lambdas[index] = line.getLambda(coors[index] + 1.0, index);
+		index = std::min_element(lambdas.begin(), lambdas.end()) - lambdas.begin();
+		assert(lambdas[index] >= lambda);
+		
+		if (lambda > lambda_max) {
+			return;
+		}
+	}
+}
 
 
 // main methods
@@ -824,11 +942,7 @@ std::unique_ptr<float[]> Projector::getSingleForwardProjection(int angleIndex) c
 		case SumAlgorithm::LINE:
 			line = constructLine(geometry->getLine(angleIndex, detectorIndex));
 			out = sumLine(line);
-			break;
-		case SumAlgorithm::LINE_BY_WEIGHTS:
-			line = constructLine(geometry->getLine(angleIndex, detectorIndex));
-			out = sumLineByWeights(line);
-			break;
+			break; 
 		case SumAlgorithm::LINE3DPARALLEL:
 			detector_i = detectorIndex % geometry->nDetectorsX;
 			detector_j = detectorIndex / geometry->nDetectorsX;
@@ -878,7 +992,7 @@ std::unique_ptr<float[]> Projector::getSingleForwardProjection(int angleIndex) c
 	return outLineImg;
 }
 
-void Projector::buildForwardProjection(){
+void Projector::buildForwardProjectionOld(){
 	// build projection for every angle
 	// x axis is angle to detector as an index in input 'angles' vector
 	// y axis is a detector pixel
@@ -899,7 +1013,7 @@ std::unique_ptr<unsigned char[]> Projector::getForwardProjectionImage() {
 	// y axis is a detector pixel
 
 	if (forwardProjection == nullptr)
-		buildForwardProjection();
+		buildForwardProjectionOld();
 
 	std::unique_ptr<unsigned char[]> outCharImg(new unsigned char[geometry->nDetectors * geometry->angles.size()]);
 	float max_val = *std::max_element(&forwardProjection[0], &forwardProjection[geometry->nDetectors * geometry->angles.size() - 1]);
@@ -917,23 +1031,28 @@ std::unique_ptr<float[]> Projector::getForwardProjection() {
 	// getter for python interface
 
 	if (!forwardProjection) {
-		buildForwardProjection();
+		buildForwardProjectionOld();
 	}
 	return std::move(forwardProjection);
 }
 
-
-
+// getWeightsLine3D(line, coorDst, weightsDst, sizeDst);
+// getWeightsArea(line1, line2, coorDst, weightsDst, sizeDst);
+// getWeightsAreaExact(line1, line2, coorDst, weightsDst, sizeDst);
 // main methods weights
 
 void Projector::buildBackProjection() {
 	// build back projection
 	int sizeDst = 0;
-	int* coorDst = new int[imgSize_x + imgSize_y + 1]();
-	float* weightsDst = new float[imgSize_x + imgSize_y + 1]();
+	int weights_size = imgSize_x + imgSize_y + imgSize_z + 1;
+	if (sumAlgorithm == SumAlgorithm::AREA || sumAlgorithm == SumAlgorithm::AREA_EXACT)
+		weights_size *= 2;
+	int* coorDst = new int[weights_size]();
+	float* weightsDst = new float[weights_size]();
 
 	int sizeZ = geometry->imgCenterZ > 0 ? geometry->imgCenterZ * 2 : 1;
-	backProjection = std::unique_ptr<float[]>(new float[geometry->imgCenterX * geometry->imgCenterY * sizeZ * 4]);
+	
+	backProjection = std::unique_ptr<float[]>(new float[geometry->imgCenterX * geometry->imgCenterY * sizeZ * 4]{});
 	for (int angleIndex = 0; angleIndex < geometry->angles.size(); ++angleIndex) {
 		for (int detectorIndex = 0; detectorIndex < geometry->nDetectors; ++detectorIndex) {
 			getWeights(angleIndex, detectorIndex, coorDst, weightsDst, &sizeDst);
@@ -945,9 +1064,44 @@ void Projector::buildBackProjection() {
 			projectBack(value, coorDst, weightsDst, sizeDst);
 		}
 	}
+	delete[] coorDst;
+	delete[] weightsDst;
 }
 
+void Projector::buildForwardProjection() {
+	int sizeDst = 0;
+	int weights_size = imgSize_x + imgSize_y + imgSize_z + 1;
+	if (sumAlgorithm == SumAlgorithm::AREA || sumAlgorithm == SumAlgorithm::AREA_EXACT)
+		weights_size *= 2;
+	int* coorDst = new int[weights_size]();
+	float* weightsDst = new float[weights_size]();
+	forwardProjection = std::unique_ptr<float[]>(new float[geometry->nDetectors * geometry->angles.size()]{});
 
+	for (int angleIndex = 0; angleIndex < geometry->angles.size(); ++angleIndex) {
+		for (int detectorIndex = 0; detectorIndex < geometry->nDetectors; ++detectorIndex) {
+			
+			getWeights(angleIndex, detectorIndex, coorDst, weightsDst, &sizeDst);
+			projectForward(angleIndex, detectorIndex, coorDst, weightsDst, sizeDst);
+		}
+	}
+
+	delete[] coorDst;
+	delete[] weightsDst;
+}
+
+void Projector::projectBack(float value, int* coors, float* weights, int size) {
+	for (int i = 0; i < size; ++i) {
+		backProjection[coors[i]] += weights[i] * value;
+	}
+}
+
+void Projector::projectForward(int angleIndex, int detectorIndex, int* coors, float* weights, int size) {
+	float sum = 0.0f;
+	for (int i = 0; i < size; ++i) {
+		sum += weights[i] * inputImg.inputImg[coors[i]];
+	}
+	forwardProjection[angleIndex * geometry->nDetectors + detectorIndex] = sum;
+}
 
 void Projector::getWeights(int angleIndex, int detectorIndex, int* coorDst, float* weightsDst, int* sizeDst) {
 
@@ -955,18 +1109,59 @@ void Projector::getWeights(int angleIndex, int detectorIndex, int* coorDst, floa
 	std::pair<Line, Line> line_pair;
 	int detector_i, detector_j;
 	int slice;
-
+	*sizeDst = 0;
 	switch (sumAlgorithm)
 	{
-	case SumAlgorithm::LINE_BY_WEIGHTS:
+	case SumAlgorithm::LINE:
 		line = constructLine(geometry->getLine(angleIndex, detectorIndex));
 		getWeightsLine(line, coorDst, weightsDst, sizeDst);
 		break;
+	case SumAlgorithm::LINE3DPARALLEL:
+		detector_i = detectorIndex % geometry->nDetectorsX;
+		detector_j = detectorIndex / geometry->nDetectorsX;
+		slice = std::floor((detector_j + 0.5) - geometry->nDetectorsY + geometry->imgCenterZ);
+		line = constructLine(geometry->getLine(angleIndex, detector_i));
+		getWeightsLine(line, coorDst, weightsDst, sizeDst, slice);
+		break;
+	case SumAlgorithm::LINE3DFAN:
+		line = constructLine3D(geometry->getLine(angleIndex, detectorIndex));
+		getWeightsLine3D(line, coorDst, weightsDst, sizeDst);
+		break;
+	case SumAlgorithm::BINARY:
+		line = constructLine(geometry->getLine(angleIndex, detectorIndex));
+		getWeightsLine(line, coorDst, weightsDst, sizeDst, 0, true);
+		break;
+	case SumAlgorithm::BINARY3DPARALLEL:
+		detector_i = detectorIndex % geometry->nDetectorsX;
+		detector_j = detectorIndex / geometry->nDetectorsX;
+		slice = std::floor((detector_j + 0.5) - geometry->nDetectorsY + geometry->imgCenterZ);
+		line = constructLine(geometry->getLine(angleIndex, detector_i));
+		getWeightsLine(line, coorDst, weightsDst, sizeDst, slice, true);
+		break;
+	case SumAlgorithm::AREA:
+		line_pair = geometry->getLinePair(angleIndex, detectorIndex);
+		line1 = constructLine(line_pair.first);
+		line2 = constructLine(line_pair.second, line1.transpose, line1.reverse_x);
+		getWeightsArea(line1, line2, coorDst, weightsDst, sizeDst);
+		break;
+	case SumAlgorithm::AREA_EXACT:
+		line_pair = geometry->getLinePair(angleIndex, detectorIndex, false);
+		if ((line_pair.first.isHorizontal ^ line_pair.second.isHorizontal) || (line_pair.first.isVertical ^ line_pair.second.isVertical)) {
+			std::pair<Line, Line> sorted_lines = sortLines(line_pair.first, line_pair.second);
+			line1 = sorted_lines.first;
+			line2 = sorted_lines.second;
+		}
+		else {
+			line1 = constructLine(line_pair.first);
+			line2 = constructLine(line_pair.second, line1.transpose, line1.reverse_x);
+		}
+		//getWeightsAreaExact(line1, line2, coorDst, weightsDst, sizeDst);
+		break;
+
 	default:
 		break;
 	}
 }
-
 
 // debug methods
 
@@ -982,10 +1177,6 @@ float Projector::getLineProjectionTest(int i_angle, int detector) {
 	case SumAlgorithm::LINE:
 		line = constructLine(geometry->getLine(i_angle, detector));
 		out = sumLine(line);
-		break;
-	case SumAlgorithm::LINE_BY_WEIGHTS:
-		line = constructLine(geometry->getLine(i_angle, detector));
-		out = sumLineByWeights(line);
 		break;
 	case SumAlgorithm::LINE3DPARALLEL:
 		detector_i = detector % geometry->nDetectorsX;

@@ -109,7 +109,7 @@ def calculate_sino_3D(model, geometry):
     detector_size_x, detector_size_y = (128, 128)
     angles = np.linspace(0, np.pi, 180, False)
     source_object = 7000
-    object_det = 500
+    object_det = 1000
     
     with open(phantom_path, "r") as f:
         size_x, size_y, size_z = [int(x) for x in f.readline().split()]

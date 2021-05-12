@@ -30,13 +30,17 @@ public:
 	
 	// main methods
 	std::unique_ptr<float[]> getSingleForwardProjection(int angle_i) const;
-	void buildForwardProjection();
+	void buildForwardProjectionOld();
 	std::unique_ptr<float[]> getForwardProjection();
 	std::unique_ptr<unsigned char[]> getForwardProjectionImage();
-	void buildBackProjection(); 
+	
+	// weighted methods
+	void buildBackProjection();
+	void buildForwardProjection();
 	void getWeights(int angleIndex, int detectorIndex, int* coorDst, float* weightsDst, int* sizeDst);
 	void projectBack(float value, int* coors, float* weights, int size);
-
+	void projectForward(int angleIndex, int detectorIndex, int* coors, float* weights, int size);
+	
 	// common methods
 	std::pair<Point, Point> getIntersectionPoints(const Line& line) const;
 	Line constructLine(const Line& line) const;
@@ -57,12 +61,14 @@ public:
 	float sumBinary(const Line& line) const;
 
 	// weight algorithms
-	void weightNeibs(double j_min, double j_max, double i, int* coorDst, float* weightsDst, int* sizeDst, bool transpose, bool reverse_x, int slice = 0) const;
-	void getWeightsLine(const Line& line, int* coorDst, float* weightsDst, int* size, int slice=0) const;
-	float sumByWeights(int* coorDst, float* weightsDst, int* sizeDst) const;
-	float distributeByWeights(float value, int* coorDst, float* weightsDst, int* sizeDst) const;
-	float sumLineByWeights(const Line& line, int slice = 0) const;
-
+	void weightNeibsArea(int i_min, int i_max, int j, const Line& line, const Line& line2,
+		int* coorDst, float* weightsDst, int* sizeDst) const;
+	void weightNeibsLine(double j_min, double j_max, double i, 
+		int* coorDst, float* weightsDst, int* sizeDst, bool transpose, bool reverse_x, int slice = 0, float koeff = 1) const;
+	
+	void getWeightsLine(const Line& line, int* coorDst, float* weightsDst, int* size, int slice = 0, bool isBinary = false) const;
+	void getWeightsLine3D(const Line& line, int* coorDst, float* weightsDst, int* sizeDst) const;
+	void getWeightsArea(const Line& line_1, const Line& line_2, int* coorDst, float* weightsDst, int* sizeDst) const;
 	
 	// debug methods
 	float getLineProjectionTest(int angle, int detector);
