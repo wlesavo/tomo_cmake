@@ -67,7 +67,7 @@ float MyImg::get(int i, int j, int k, bool reverse_x, bool reverse_y, bool rever
 
 int MyImg::get_coor(int i, int j, int k, bool reverse_x, bool reverse_y, bool reverse_z) const {
 	if (i < 0 || i >= size_x || j < 0 || j >= size_y || k < 0 || k >= size_z) {
-		return 0;
+		return -1;
 	}
 	int coor;
 	if (reverse_x)
@@ -77,5 +77,6 @@ int MyImg::get_coor(int i, int j, int k, bool reverse_x, bool reverse_y, bool re
 	if (reverse_z)
 		k = size_z - 1 - k;
 	coor = i + j * size_x + k * size_x * size_y;
+
 	return coor;
 };

@@ -2,7 +2,7 @@
 import numpy as np
 from PIL import Image
 import math
-from tomopy.misc.phantom import shepp2d
+import tomopy.misc.phantom as tomo
 
 def create_phantom(dim, model, size_x, size_y, size_z):
     phantom_path = "phantoms/"+model+"_"+dim
@@ -11,7 +11,7 @@ def create_phantom(dim, model, size_x, size_y, size_z):
     phantom = np.zeros((size_x, size_y, size_z))
     
     if model == "phantom":
-        phantom2D = np.squeeze(shepp2d(size_x))
+        phantom2D = np.squeeze(tomo.shepp2d(size_x))
     else:
         phantom2D = np.zeros((size_x, size_y))
         phantom2D[5:6, 5:6] = 200
@@ -26,6 +26,13 @@ def create_phantom(dim, model, size_x, size_y, size_z):
     
     for i in range(size_z):
         phantom[:, :, i] = phantom2D
+    
+    if dim=="3D" and model == "phantom":
+        phantom1 = tomo.shepp3d(size_x)
+        
+        for i in range(size_z):
+            phantom[i, :, :] = phantom1[:, :, i].T
+        
     
     with open(phantom_txt_path, "w") as f:
         f.write(str(size_x) + " " + str(size_y) + " " + str(size_z)+"\n")

@@ -50,17 +50,19 @@ public:
 	double singlePixelArea(int i, int j, const Line& line) const;
 
 	// sum algorithms
-	float sumAreaExact(const Line& line_1, const Line& line_2) const;
+	float sumAreaExact(const Line& line1, const Line& line2) const;
 
 	// weight algorithms
-	void weightNeibsArea(int i_min, int i_max, int j, const Line& line, const Line& line2,
+	void weightNeibsAreaDual(int i_min, int i_max, int j, const Line& line1, const Line& line2,
+		int* coorDst, float* weightsDst, int* sizeDst) const;
+	void weightNeibsAreaSingle(int i_min, int i_max, int j, const Line& line, bool upper,
 		int* coorDst, float* weightsDst, int* sizeDst) const;
 	void weightNeibsLine(double j_min, double j_max, double i, 
 		int* coorDst, float* weightsDst, int* sizeDst, bool transpose, bool reverse_x, int slice = 0, float koeff = 1) const;
-	
 	void getWeightsLine(const Line& line, int* coorDst, float* weightsDst, int* size, int slice = 0, bool isBinary = false) const;
-	void getWeightsLine3D(const Line& line, int* coorDst, float* weightsDst, int* sizeDst) const;
-	void getWeightsArea(const Line& line_1, const Line& line_2, int* coorDst, float* weightsDst, int* sizeDst) const;
+	void getWeightsLine3D(const Line& line, int* coorDst, float* weightsDst, int* sizeDst, bool isBinary = false) const;
+	void getWeightsArea(const Line& line1, const Line& line2, int* coorDst, float* weightsDst, int* sizeDst) const;
+	void getWeightsAreaExact(const Line& line1, const Line& line2, int* coorDst, float* weightsDst, int* sizeDst) const;
 	
 
 

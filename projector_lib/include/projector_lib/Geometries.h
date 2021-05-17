@@ -68,11 +68,11 @@ public:
 		return Line(x_source, y_source, x_det, y_det);
 	};
 
-	virtual std::pair<Line, Line> getLinePair(int angleIndex, int detectorIndex, bool isParallel = false) {
+	virtual std::pair<Line, Line> getLinePair(int angleIndex, int detectorIndex, bool isParallel = true) {
 		double angle = angles[angleIndex];
 		if (!isParallel) {
-			double x_source = -dSourceToObj * std::sin(angle) + imgCenterX;
-			double y_source = -dSourceToObj * std::cos(angle) + imgCenterY;
+			double x_source = - dSourceToObj * std::sin(angle) + imgCenterX;
+			double y_source = - dSourceToObj * std::cos(angle) + imgCenterY;
 			double x_det1 = distanceToDetectorPixel[detectorIndex] * std::sin(angle - angleToDetectorPixel[detectorIndex]) + imgCenterX;
 			double y_det1 = distanceToDetectorPixel[detectorIndex] * std::cos(angle - angleToDetectorPixel[detectorIndex]) + imgCenterY;
 			double x_det2 = distanceToDetectorPixel[detectorIndex + 1] * std::sin(angle - angleToDetectorPixel[detectorIndex + 1]) + imgCenterX;

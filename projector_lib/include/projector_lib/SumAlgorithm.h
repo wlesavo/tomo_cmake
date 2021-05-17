@@ -9,5 +9,6 @@ enum class SumAlgorithm {
 	LINEAR,
 	BINARY,
 	BINARY3DPARALLEL,
+	BINARY3DCONE,
 };
 #endif

@@ -58,7 +58,7 @@ def calculate_sino_2D(geometry, algo, model):
     detector_size_x = 256
     angles = np.linspace(0, 2*np.pi, 360, False)
     source_object = 7000
-    object_det = 1000
+    object_det = 500
         
     with open(phantom_path, "r") as f:
         size_x, size_y, size_z = [int(x) for x in f.readline().split()]
@@ -107,9 +107,9 @@ def calculate_sino_3D(model, geometry):
     sinogram_txt_path = "target_sinograms/sinogram_3D_"+model+".txt"
     sinogram_bmp_path = "target_sinograms/sinogram_3D_"+model+".bmp"
     detector_size_x, detector_size_y = (128, 128)
-    angles = np.linspace(0, np.pi, 180, False)
-    source_object = 7000
-    object_det = 1000
+    angles = np.linspace(0, np.pi*2, 360, False)
+    source_object = 1000
+    object_det = 300
     
     with open(phantom_path, "r") as f:
         size_x, size_y, size_z = [int(x) for x in f.readline().split()]
@@ -132,7 +132,7 @@ def calculate_sino_3D(model, geometry):
     elif geometry == "fan":
         proj_geom = astra.create_proj_geom('cone', 1.0, 1.0, detector_size_y, detector_size_x, angles, source_object, object_det);
     
- 
+    
     sinogram = fp_3D(proj_geom, vol_geom, phantom)
     sino_arr = np.zeros((detector_size_x, angles.shape[0]*detector_size_y))
     det_count = detector_size_y*detector_size_x
@@ -150,14 +150,14 @@ def calculate_sino_3D(model, geometry):
     im.save(sinogram_bmp_path)
 
 def create_all():
-    calculate_sino_2D("par", "line", "phantom")
-    calculate_sino_2D("fan", "line", "phantom")
-    calculate_sino_2D("par", "area", "phantom")
-    calculate_sino_2D("fan", "area", "phantom")
-    calculate_sino_2D("par", "line", "model")
-    calculate_sino_2D("fan", "line", "model")
-    calculate_sino_2D("par", "area", "model")
-    calculate_sino_2D("fan", "area", "model")
+    #calculate_sino_2D("par", "line", "phantom")
+    #calculate_sino_2D("fan", "line", "phantom")
+    #calculate_sino_2D("par", "area", "phantom")
+    #calculate_sino_2D("fan", "area", "phantom")
+    #calculate_sino_2D("par", "line", "model")
+    #calculate_sino_2D("fan", "line", "model")
+    #calculate_sino_2D("par", "area", "model")
+    #calculate_sino_2D("fan", "area", "model")
     #calculate_sino_3D("model", "fan")
     #calculate_sino_3D("model", "par")
     calculate_sino_3D("phantom", "fan")
